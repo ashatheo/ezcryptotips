@@ -2,14 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { 
   QrCode, 
   Wallet, 
-  CreditCard, 
   User, 
   Share2, 
-  CheckCircle2, 
   Zap, 
   Coins,
-  History,
-  Info,
   ArrowLeft
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
@@ -17,8 +13,6 @@ import {
   getFirestore, 
   collection, 
   addDoc, 
-  doc, 
-  getDoc, 
   serverTimestamp 
 } from 'firebase/firestore';
 
@@ -27,7 +21,7 @@ import {
 const firebaseConfig = JSON.parse(__firebase_config || '{}');
 
 // Initialization (safe check for preview environment)
-let db;
+let db: any;
 try {
   const app = initializeApp(firebaseConfig);
   db = getFirestore(app);
@@ -37,8 +31,6 @@ try {
 
 // --- CONSTANTS ---
 const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'ez-crypto-tips';
-const SERVICE_HEDERA_ID = "0.0.123456"; // Your Hedera account ID for service fees
-const SERVICE_POLYGON_ADDR = "0xYourServiceAddress..."; 
 
 // Hedera Brand Colors
 const HEDERA_GREEN = "#00eb78";
@@ -49,8 +41,7 @@ type WaiterProfile = {
   id?: string;
   name: string;
   restaurant: string;
-  hederaId: string;
-  polygonAddress: string;
+  hederaId: string; // Waiter's Hedera Account ID
   bio?: string;
 };
 
@@ -61,7 +52,6 @@ const MOCK_WAITER: WaiterProfile = {
   name: 'Alex',
   restaurant: 'Burger Heroes',
   hederaId: '0.0.451923',
-  polygonAddress: '0x71C...9A21',
   bio: 'Saving for my own food truck! 🍔'
 };
 
@@ -70,16 +60,14 @@ export default function App() {
   const [view, setView] = useState<'landing' | 'register' | 'pay' | 'success'>('landing');
   const [waiterData, setWaiterData] = useState<WaiterProfile | null>(null);
   const [amount, setAmount] = useState<string>('');
-  const [selectedChain, setSelectedChain] = useState<'hedera' | 'polygon'>('hedera');
+  const [review, setReview] = useState<string>(''); // Review text state
   const [loading, setLoading] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState<string>('');
   
-  // Registration Form State
+  // Registration Form State (only Hedera ID needed now)
   const [regForm, setRegForm] = useState({
     name: '',
     restaurant: '',
     hederaId: '',
-    polygonAddress: ''
   });
 
   // --- NAVIGATION HELPERS ---
@@ -87,6 +75,8 @@ export default function App() {
   // Emulate QR code scanning (navigates to specific waiter's payment page)
   const openPaymentPage = (profile: WaiterProfile) => {
     setWaiterData(profile);
+    setAmount(''); // Reset state when opening pay view
+    setReview(''); // Reset review state
     setView('pay');
   };
 
@@ -106,7 +96,6 @@ export default function App() {
         
         const newProfile = { ...regForm, id: docRef.id };
         setWaiterData(newProfile);
-        // In a real app, this would redirect to the waiter's dashboard
         alert(`Profile created! ID: ${docRef.id}`);
         openPaymentPage(newProfile); // Show immediately as client sees it
       } else {
@@ -127,45 +116,42 @@ export default function App() {
   const handlePayment = async () => {
     if (!amount || parseFloat(amount) <= 0) return;
     setLoading(true);
-    setPaymentStatus('Initiating wallet connection...');
 
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     try {
-      if (selectedChain === 'hedera') {
-        await processHederaPayment();
-      } else {
-        await processPolygonPayment();
-      }
+      await processPayment();
       setView('success');
     } catch (error) {
       alert("Payment cancelled or failed");
     } finally {
       setLoading(false);
-      setPaymentStatus('');
     }
   };
 
   /**
-   * HEDERA Payment Logic
-   * Uses Native HBAR Transfer with split payment
+   * HEDERA Payment Logic (Using EVM Smart Contract)
+   * Calls the TipSplitter.sol contract deployed on Hedera EVM to split the tip and record the review.
    */
-  const processHederaPayment = async () => {
-    console.log("--- HEDERA PAYMENT LOGIC START ---");
-    console.log(`Sending ${amount} HBAR to ${waiterData?.hederaId}`);
+  const processPayment = async () => {
+    console.log("--- HEDERA EVM SMART CONTRACT PAYMENT LOGIC START ---");
+    // Waiter's Hedera ID (0.0.xxxxx) needs to be converted to a corresponding EVM address (0x...) 
+    // for contract interaction. For simulation, we assume an EVM address is used.
     
-    // Simulate success response from HashPack
-    alert(`[HEDERA SIMULATION]\n\nOpening HashPack...\n\nTransaction:\n- Debit: ${amount} HBAR\n- Waiter: ${parseFloat(amount) * 0.95} HBAR\n- Platform Fee: ${parseFloat(amount) * 0.05} HBAR\n\nStatus: SUCCESS (Consensus Reached)`);
-  };
-
-  /**
-   * POLYGON Payment Logic
-   * Uses TipSplitter.sol smart contract
-   */
-  const processPolygonPayment = async () => {
-    console.log("--- POLYGON PAYMENT LOGIC START ---");
-    alert(`[POLYGON SIMULATION]\n\nOpening MetaMask...\n\nCalling Contract TipSplitter.sendTip()\nArg: ${waiterData?.polygonAddress}\nAmount: ${amount} MATIC\n\nStatus: Mined Block #12345`);
+    // In a real app: Call TipSplitter.sendTipAndReview(waiterEVMAddress, reviewText) via web3/ethers on Hedera EVM
+    const evmAddressSim = '0x123...abc'; // Simulated EVM address derived from waiterData.hederaId
+    
+    const reviewPayload = review.trim() ? `\nReview: "${review.trim()}"` : '';
+    
+    alert(
+      `[HEDERA EVM SMART CONTRACT SIMULATION]\n\n` +
+      `Opening HashPack/MetaMask...\n\n` +
+      `Calling Contract TipSplitter.sendTipAndReview()\n` +
+      `Waiter EVM Address (Simulated): ${evmAddressSim}\n` +
+      `Amount: ${amount} HBAR${reviewPayload}\n\n` +
+      `Status: Transaction successfully executed (HSCS)`
+    );
   };
 
   // --- VIEWS ---
@@ -190,7 +176,7 @@ export default function App() {
             <h1 className="text-5xl font-bold tracking-tighter text-white mb-2">
               Ez Crypto Tips
             </h1>
-            <p className="text-[#00eb78] font-mono tracking-widest text-sm uppercase">Easy Decentralized Payments</p>
+            <p className="text-[#00eb78] font-mono tracking-widest text-sm uppercase">Powered by Hedera EVM</p>
           </div>
           
           <p className="text-gray-400 text-lg leading-relaxed font-light">
@@ -204,7 +190,7 @@ export default function App() {
               className="w-full bg-[#00eb78] hover:bg-[#00c96d] text-black font-bold py-4 px-6 rounded-full transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_20px_rgba(0,235,120,0.3)] flex items-center justify-center gap-2"
             >
               <User size={20} />
-              I'm a Waiter (Create QR)
+              I am a Waiter (Create QR)
             </button>
             
             <button 
@@ -217,8 +203,8 @@ export default function App() {
           </div>
           
           <div className="pt-16 flex justify-center gap-6 text-[10px] uppercase tracking-widest text-gray-500 font-mono">
-            <span className="flex items-center gap-1">Hedera Native</span>
-            <span className="flex items-center gap-1">Polygon EVM</span>
+            <span className="flex items-center gap-1">Reviews are recorded on-chain and cannot be edited or deleted.</span>
+            <span className="flex items-center gap-1">Low 5% service fee.</span>
           </div>
         </div>
       </div>
@@ -233,7 +219,7 @@ export default function App() {
             <button onClick={() => setView('landing')} className="text-gray-400 hover:text-white mb-6 transition-colors">
               <ArrowLeft size={24} />
             </button>
-            <h2 className="text-3xl font-bold text-white mb-1">Sign Up</h2>
+            <h2 className="text-3xl font-bold text-white mb-1">Registration</h2>
             <p className="text-gray-400">Create your Ez Crypto Tips profile</p>
           </div>
           
@@ -251,7 +237,7 @@ export default function App() {
             </div>
             
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Establishment</label>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Restaurant / Venue</label>
               <input 
                 required
                 type="text" 
@@ -265,7 +251,7 @@ export default function App() {
             <div className="pt-2">
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 flex items-center justify-between">
                  Hedera Account ID
-                 <span className="text-[10px] text-[#00eb78] bg-[#00eb78]/10 px-2 py-1 rounded">Recommended</span>
+                 <span className="text-[10px] text-[#00eb78] bg-[#00eb78]/10 px-2 py-1 rounded">Required for payment</span>
               </label>
               <input 
                 required
@@ -274,18 +260,6 @@ export default function App() {
                 placeholder="0.0.xxxxx"
                 value={regForm.hederaId}
                 onChange={e => setRegForm({...regForm, hederaId: e.target.value})}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Polygon Address</label>
-              <input 
-                required
-                type="text" 
-                className="w-full bg-black text-white p-4 border border-gray-700 rounded-xl focus:border-[#00eb78] focus:ring-1 focus:ring-[#00eb78] outline-none transition-all font-mono placeholder-gray-600"
-                placeholder="0x..."
-                value={regForm.polygonAddress}
-                onChange={e => setRegForm({...regForm, polygonAddress: e.target.value})}
               />
             </div>
 
@@ -346,35 +320,24 @@ export default function App() {
                     placeholder="Custom amount"
                   />
                   <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-bold text-sm">
-                     {selectedChain === 'hedera' ? 'HBAR' : 'MATIC'}
+                     HBAR
                   </span>
                </div>
+               <p className="text-[10px] text-[#00eb78] mt-3 flex items-center gap-1 font-mono">
+                   <Zap size={10}/> LIGHTNING FAST ON HEDERA
+               </p>
             </div>
 
+            {/* Review Field */}
             <div className="mb-8">
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Network</label>
-              <div className="grid grid-cols-2 gap-3">
-                <button 
-                  onClick={() => setSelectedChain('hedera')}
-                  className={`p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${selectedChain === 'hedera' ? 'border-[#00eb78] bg-[#00eb78] text-black font-bold' : 'border-gray-700 bg-black text-gray-400 hover:border-gray-500'}`}
-                >
-                  <div className={`w-2 h-2 rounded-full ${selectedChain === 'hedera' ? 'bg-black' : 'bg-gray-400'}`}></div>
-                  Hedera
-                </button>
-                
-                <button 
-                  onClick={() => setSelectedChain('polygon')}
-                  className={`p-4 rounded-xl border flex items-center justify-center gap-2 transition-all ${selectedChain === 'polygon' ? 'border-purple-500 bg-purple-500/20 text-purple-400' : 'border-gray-700 bg-black text-gray-400 hover:border-gray-500'}`}
-                >
-                  <div className={`w-2 h-2 rounded-full ${selectedChain === 'polygon' ? 'bg-purple-400' : 'bg-gray-400'}`}></div>
-                  Polygon
-                </button>
-              </div>
-              {selectedChain === 'hedera' && (
-                 <p className="text-[10px] text-[#00eb78] mt-3 flex items-center gap-1 font-mono">
-                   <Zap size={10}/> LIGHTNING FAST & LOW FEE
-                 </p>
-              )}
+               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Review (Optional)</label>
+               <textarea
+                    value={review}
+                    onChange={(e) => setReview(e.target.value)}
+                    className="w-full bg-black text-white p-4 border border-gray-700 rounded-xl outline-none focus:border-[#00eb78] transition-colors placeholder-gray-600 resize-none"
+                    placeholder="Great service, thank you!"
+                    rows={3}
+               />
             </div>
 
             <button 
@@ -385,7 +348,7 @@ export default function App() {
                {loading ? 'Processing...' : (
                  <>
                    <Wallet size={20} />
-                   Pay {amount || '0'} {selectedChain === 'hedera' ? 'HBAR' : 'MATIC'}
+                   Pay {amount || '0'} HBAR
                  </>
                )}
             </button>
@@ -403,20 +366,31 @@ export default function App() {
           <Coins size={64} color={HEDERA_GREEN} className="relative z-10" />
         </div>
         
-        <h2 className="text-4xl font-bold text-white mb-2">Success</h2>
+        <h2 className="text-4xl font-bold text-white mb-2">Success!</h2>
         <p className="text-gray-400 max-w-xs mx-auto mb-10 text-lg">
-          Your tip has been successfully sent to <span className="text-white font-medium">{waiterData?.name}</span> via Ez Crypto Tips.
+          Your tip was sent to <span className="text-white font-medium">{waiterData?.name}</span> via Ez Crypto Tips.
         </p>
 
         <div className="bg-[#181818] p-6 rounded-2xl border border-gray-800 w-full max-w-sm text-left mb-8 space-y-4">
            <div className="flex justify-between items-center pb-4 border-b border-gray-800">
              <span className="text-gray-500 text-sm">Total Amount</span>
-             <span className="font-bold text-2xl text-white">{amount} <span className="text-sm text-gray-500 font-normal">{selectedChain === 'hedera' ? 'HBAR' : 'MATIC'}</span></span>
+             <span className="font-bold text-2xl text-white">{amount} <span className="text-sm text-gray-500 font-normal">HBAR</span></span>
            </div>
+           
+           {/* Display Review */}
+           {review.trim() && (
+             <div className="pt-4 border-t border-gray-800">
+               <span className="text-gray-500 text-sm block mb-2">Review Left (Recorded On-Chain)</span>
+               <p className="text-white italic text-sm p-3 bg-black/50 rounded-lg border border-gray-700">
+                 "{review.trim()}"
+               </p>
+             </div>
+           )}
+
            <div className="flex justify-between items-center">
              <span className="text-gray-500 text-sm">Recipient ID</span>
              <span className="font-mono text-xs text-[#00eb78] bg-[#00eb78]/10 px-2 py-1 rounded">
-                {selectedChain === 'hedera' ? waiterData?.hederaId : waiterData?.polygonAddress.slice(0,6)+'...'}
+                {waiterData?.hederaId}
              </span>
            </div>
         </div>
