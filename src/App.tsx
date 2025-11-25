@@ -17,8 +17,9 @@ import {
 } from 'firebase/firestore';
 
 // --- FIREBASE CONFIGURATION ---
-// In a real project, these values come from env variables
-const firebaseConfig = JSON.parse(__firebase_config || '{}');
+const firebaseConfig = JSON.parse(
+  typeof __firebase_config !== 'undefined' ? __firebase_config : '{}'
+);
 
 // Initialization (safe check for preview environment)
 let db: any;
