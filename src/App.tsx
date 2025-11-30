@@ -6,13 +6,17 @@ import {
   Share2, 
   Zap, 
   Coins,
-  ArrowLeft
+  ArrowLeft,
+  Download
 } from 'lucide-react';
+import QRCode from 'react-qr-code';
 import { initializeApp } from 'firebase/app';
 import { 
   getFirestore, 
   collection, 
   addDoc, 
+  getDoc,
+  doc,
   serverTimestamp 
 } from 'firebase/firestore';
 
@@ -78,12 +82,56 @@ const MOCK_WAITER: WaiterProfile = {
 
 export default function App() {
   // State
-  const [view, setView] = useState<'landing' | 'register' | 'pay' | 'success'>('landing');
+  const [view, setView] = useState<'landing' | 'register' | 'qr' | 'pay' | 'success'>('landing');
   const [waiterData, setWaiterData] = useState<WaiterProfile | null>(null);
   const [amount, setAmount] = useState<string>('');
   const [review, setReview] = useState<string>(''); 
   const [loading, setLoading] = useState(false);
   const [selectedToken, setSelectedToken] = useState<TokenOption>(AVAILABLE_TOKENS[0]);
+
+  // --- URL PARAMETER HANDLING ---
+  useEffect(() => {
+    // Check for waiter ID in URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const waiterId = urlParams.get('waiter');
+    
+    if (waiterId) {
+      // Try to load waiter data from Firebase or use mock
+      loadWaiterProfile(waiterId);
+    }
+  }, []);
+
+  const loadWaiterProfile = async (waiterId: string) => {
+    setLoading(true);
+    try {
+      if (db) {
+        const docRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'waiters', waiterId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const profile = { id: docSnap.id, ...docSnap.data() } as WaiterProfile;
+          openPaymentPage(profile);
+        } else {
+          alert('Waiter profile not found.');
+          setView('landing');
+        }
+      } else {
+        // Mock mode - use demo waiter
+        openPaymentPage(MOCK_WAITER);
+      }
+    } catch (error) {
+      console.error('Error loading waiter profile:', error);
+      alert('Error loading waiter profile');
+      setView('landing');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- QR CODE GENERATION ---
+  const generateQRUrl = (waiterId: string): string => {
+    const baseUrl = window.location.origin + window.location.pathname.replace(/\/$/, '');
+    return `${baseUrl}?waiter=${waiterId}`;
+  };
 
   // Registration Form State
   const [regForm, setRegForm] = useState({
@@ -127,11 +175,13 @@ export default function App() {
         const newProfile = { ...regForm, id: docRef.id };
         setWaiterData(newProfile);
         console.log(`Profile created! ID: ${docRef.id}`);
-        openPaymentPage(newProfile); 
+        setView('qr'); // Show QR code instead of payment page
       } else {
-        // Mock mode
-        setWaiterData({ ...regForm, id: 'mock-id' });
-        openPaymentPage({ ...regForm, id: 'mock-id' });
+        // Mock mode - generate a unique ID
+        const mockId = 'mock-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        const newProfile = { ...regForm, id: mockId };
+        setWaiterData(newProfile);
+        setView('qr'); // Show QR code instead of payment page
       }
     } catch (error) {
       console.error("Error adding document: ", error);
@@ -237,6 +287,82 @@ export default function App() {
               <Zap size={20} color={HEDERA_GREEN} />
               Demo Payment (Guest)
             </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === 'qr') {
+    if (!waiterData || !waiterData.id) {
+      setView('landing');
+      return null;
+    }
+
+    const qrUrl = generateQRUrl(waiterData.id);
+
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 font-sans">
+        <div className="max-w-md w-full mx-auto bg-[#181818] rounded-3xl border border-gray-800 overflow-hidden shadow-2xl">
+          <div className="p-8 border-b border-gray-800 text-center">
+            <h2 className="text-3xl font-bold text-white mb-2">Your QR Code</h2>
+            <p className="text-gray-400 text-sm">Share this code with customers to receive tips</p>
+          </div>
+
+          <div className="p-8 flex flex-col items-center space-y-6">
+            {/* QR Code */}
+            <div className="bg-white p-6 rounded-2xl shadow-2xl">
+              <QRCode
+                value={qrUrl}
+                size={256}
+                style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                viewBox={`0 0 256 256`}
+              />
+            </div>
+
+            {/* Waiter Info */}
+            <div className="w-full text-center space-y-2">
+              <div className="w-16 h-16 bg-black rounded-full mx-auto border border-gray-700 flex items-center justify-center text-2xl font-bold text-white">
+                {waiterData.name.charAt(0)}
+              </div>
+              <h3 className="text-xl font-bold text-white">{waiterData.name}</h3>
+              <p className="text-gray-500 uppercase text-xs tracking-wider">{waiterData.restaurant}</p>
+            </div>
+
+            {/* QR URL (for sharing) */}
+            <div className="w-full p-4 bg-black rounded-xl border border-gray-800">
+              <p className="text-xs text-gray-500 mb-2 text-center">Share Link:</p>
+              <p className="font-mono text-xs text-gray-300 break-all text-center">{qrUrl}</p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="w-full grid gap-3">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(qrUrl);
+                  alert('Link copied to clipboard!');
+                }}
+                className="w-full bg-[#00eb78] hover:bg-[#00c96d] text-black font-bold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2"
+              >
+                <Share2 size={18} />
+                Copy Link
+              </button>
+              
+              <button
+                onClick={() => openPaymentPage(waiterData)}
+                className="w-full bg-transparent hover:bg-white/10 text-white font-semibold py-3 px-6 rounded-xl border border-white/30 transition-all flex items-center justify-center gap-2"
+              >
+                <Wallet size={18} />
+                Test Payment Page
+              </button>
+
+              <button
+                onClick={() => setView('landing')}
+                className="w-full bg-transparent hover:bg-white/5 text-gray-400 font-medium py-2 px-6 rounded-xl transition-all"
+              >
+                Back to Home
+              </button>
+            </div>
           </div>
         </div>
       </div>

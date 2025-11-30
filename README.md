@@ -1,15 +1,15 @@
-<<<<<<< HEAD
 # Ez Crypto Tips
 
-A modern cryptocurrency tipping application built with React, TypeScript, and Vite. Supports multiple blockchain networks including Hedera, Tron, and Base.
+A non-custodial, multi-chain tipping platform built on Hedera Hashgraph. It bridges the gap between Web3 and the real-world service industry by allowing guests to tip waiters instantly via QR code using HBAR, USDC, or USDT (supporting Hedera, Tron, and Base networks). Beyond payments, the platform utilizes the Hedera Consensus Service (HCS) to record customer reviews on-chain, creating an immutable "Proof-of-Service" reputation system for hospitality workers.
 
 ## Features
 
 - **Multi-chain support**: Hedera, Tron (TRC20), and Base (EVM)
-- **QR Code generation** for easy tipping
-- **Firebase integration** for waiter profiles
+- **Unique QR Code generation** for each waiter - customers scan to tip instantly
+- **Firebase integration** for waiter profiles and data storage
 - **Responsive design** with dark theme
 - **Real-time payment simulation**
+- **URL-based waiter profiles** - share your unique QR code link
 
 ## Tech Stack
 
@@ -19,6 +19,7 @@ A modern cryptocurrency tipping application built with React, TypeScript, and Vi
 - Tailwind CSS
 - Firebase Firestore
 - Lucide React Icons
+- react-qr-code
 
 ## Development
 
@@ -50,6 +51,13 @@ npm run build
 ```bash
 npm run preview
 ```
+
+## How It Works
+
+1. **Waiter Registration**: Waiters fill out a registration form with their wallet addresses (Hedera, Tron, and/or Base)
+2. **QR Code Generation**: After registration, a unique QR code is generated containing a link to the waiter's payment page
+3. **Customer Tipping**: Customers scan the QR code, which opens the payment page with the waiter's profile
+4. **Multi-chain Payments**: Customers can choose their preferred payment method and send tips directly
 
 ## Deployment
 
@@ -90,7 +98,7 @@ For full functionality, you need to set up Firebase:
 
 ```
 src/
-├── App.tsx          # Main application component
+├── App.tsx          # Main application component with QR code generation
 ├── main.tsx         # Application entry point
 ├── index.css        # Global styles
 └── TipSplitter.sol  # Smart contract (reference)
@@ -104,6 +112,3 @@ public/              # Static assets
 ## License
 
 MIT License
-=======
-Ez Crypto Tips is a non-custodial, multi-chain tipping platform built on Hedera Hashgraph. It bridges the gap between Web3 and the real-world service industry by allowing guests to tip waiters instantly via QR code using HBAR, USDC, or USDT (supporting Hedera, Tron, and Base networks). Beyond payments, the platform utilizes the Hedera Consensus Service (HCS) to record customer reviews on-chain, creating an immutable "Proof-of-Service" reputation system for hospitality workers
->>>>>>> a730d840b7ba26d026e0ddfb8d0cfef2b723538d
