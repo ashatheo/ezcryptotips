@@ -39,7 +39,6 @@ const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'ez-crypto-tips';
 
 // Brand Colors
 const HEDERA_GREEN = "#00eb78";
-const TRON_RED = "#FF0013";
 const BASE_BLUE = "#0052FF";
 const BRAND_BLACK = "#181818"; 
 
@@ -49,7 +48,6 @@ type WaiterProfile = {
   name: string;
   restaurant: string;
   hederaId: string; // Hedera Account ID
-  tronAddress?: string; // USDT TRC20
   baseAddress?: string; // USDT Base (EVM)
   bio?: string;
 };
@@ -65,7 +63,6 @@ type TokenOption = {
 
 const AVAILABLE_TOKENS: TokenOption[] = [
   { id: 'hbar', name: 'Hedera', network: 'Hedera', symbol: 'HBAR', color: HEDERA_GREEN, addressKey: 'hederaId' },
-  { id: 'usdt_trc20', name: 'Tron', network: 'TRC20', symbol: 'USDT', color: TRON_RED, addressKey: 'tronAddress' },
   { id: 'usdt_base', name: 'Base', network: 'Base', symbol: 'USDT', color: BASE_BLUE, addressKey: 'baseAddress' },
 ];
 
@@ -75,7 +72,6 @@ const MOCK_WAITER: WaiterProfile = {
   name: 'Alex',
   restaurant: 'Burger Heroes',
   hederaId: '0.0.451923',
-  tronAddress: 'TXj7...9x2A',
   baseAddress: '0x71C...9A21',
   bio: 'Saving for my own food truck! 🍔'
 };
@@ -138,7 +134,6 @@ export default function App() {
     name: '',
     restaurant: '',
     hederaId: '',
-    tronAddress: '',
     baseAddress: '',
   });
 
@@ -160,8 +155,8 @@ export default function App() {
 
     try {
       // Basic validation: ensure at least one payment method is provided
-      if (!regForm.hederaId && !regForm.tronAddress && !regForm.baseAddress) {
-        alert("Please provide at least one payment address (Hedera, Tron, or Base).");
+      if (!regForm.hederaId && !regForm.baseAddress) {
+        alert("Please provide at least one payment address (Hedera or Base).");
         setLoading(false);
         return;
       }
@@ -230,8 +225,6 @@ export default function App() {
 
     if (selectedToken.id === 'hbar') {
        simulationMsg = `[HEDERA SIMULATION]\nCall Hedera SDK/HashPack\nTransfer ${amount} HBAR to ${address}`;
-    } else if (selectedToken.id === 'usdt_trc20') {
-       simulationMsg = `[TRON SIMULATION]\nCall TronWeb/TronLink\nTransfer ${amount} USDT (TRC20) to ${address}`;
     } else if (selectedToken.id === 'usdt_base') {
        simulationMsg = `[BASE SIMULATION]\nCall Wagmi/MetaMask (Base Chain)\nTransfer ${amount} USDT to ${address}`;
     }
@@ -262,7 +255,7 @@ export default function App() {
               Ez Crypto Tips
             </h1>
             <p className="text-gray-400 font-mono tracking-widest text-xs uppercase">
-              <span style={{color: HEDERA_GREEN}}>Hedera</span> • <span style={{color: TRON_RED}}>Tron</span> • <span style={{color: BASE_BLUE}}>Base</span>
+              <span style={{color: HEDERA_GREEN}}>Hedera</span> • <span style={{color: BASE_BLUE}}>Base</span>
             </p>
           </div>
           
@@ -412,23 +405,12 @@ export default function App() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-[#00eb78] mb-1">Hedera Account ID</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     className="w-full bg-black text-white p-3 border border-gray-700 rounded-xl focus:border-[#00eb78] outline-none font-mono text-sm"
                     placeholder="0.0.xxxxx"
                     value={regForm.hederaId}
                     onChange={e => setRegForm({...regForm, hederaId: e.target.value})}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#FF0013] mb-1">Tron Address (TRC20)</label>
-                  <input 
-                    type="text" 
-                    className="w-full bg-black text-white p-3 border border-gray-700 rounded-xl focus:border-[#FF0013] outline-none font-mono text-sm"
-                    placeholder="T..."
-                    value={regForm.tronAddress}
-                    onChange={e => setRegForm({...regForm, tronAddress: e.target.value})}
                   />
                 </div>
 
