@@ -4,110 +4,64 @@ A non-custodial, multi-chain tipping platform built on Hedera Hashgraph. It brid
 
 ## Features
 
-- **Multi-chain support**: Hedera, Tron (TRC20), and Base (EVM)
+### Payment & Tipping
+- **Real Hedera wallet integration** via WalletConnect - connect HashPack, Blade, or other Hedera wallets
+- **Live HBAR transfers** - real blockchain transactions on Hedera network
+- **Multi-chain ready**: Base (EVM) support (simulation mode, can be activated)
 - **Unique QR Code generation** for each waiter - customers scan to tip instantly
+- **URL-based waiter profiles** - share your unique QR code link
+
+### Blockchain Reviews (HCS)
+- **Immutable reviews** - Customer reviews permanently recorded on Hedera blockchain
+- **Hedera Consensus Service (HCS)** - Timestamped, verifiable review data
+- **Proof-of-Service** - Build an on-chain reputation system for service workers
+- **Transparent & censorship-resistant** - No one can delete or modify reviews
+
+### Infrastructure
 - **Firebase integration** for waiter profiles and data storage
 - **Responsive design** with dark theme
-- **Real-time payment simulation**
-- **URL-based waiter profiles** - share your unique QR code link
+- **Real-time transaction feedback**
 
 ## Tech Stack
 
-- React 18
-- TypeScript
+### Frontend
+- React 18 + TypeScript
 - Vite
 - Tailwind CSS
-- Firebase Firestore
 - Lucide React Icons
 - react-qr-code
 
-## Development
+### Blockchain
+- **Hedera SDK** (@hashgraph/sdk) - Blockchain transactions
+- **Hedera Wallet Connect** (@hashgraph/hedera-wallet-connect) - Wallet integration
+- **WalletConnect** - Multi-wallet support (HashPack, Blade, etc.)
+- **Hedera Consensus Service (HCS)** - On-chain review storage
 
-### Prerequisites
-
-- Node.js 18+
-- npm
-
-### Installation
-
-```bash
-npm install
-```
-
-### Development Server
-
-```bash
-npm run dev
-```
-
-### Build
-
-```bash
-npm run build
-```
-
-### Preview
-
-```bash
-npm run preview
-```
+### Backend
+- Firebase Firestore - Waiter profiles and app data
 
 ## How It Works
 
-1. **Waiter Registration**: Waiters fill out a registration form with their wallet addresses (Hedera, Tron, and/or Base)
-2. **QR Code Generation**: After registration, a unique QR code is generated containing a link to the waiter's payment page
-3. **Customer Tipping**: Customers scan the QR code, which opens the payment page with the waiter's profile
-4. **Multi-chain Payments**: Customers can choose their preferred payment method and send tips directly
+### For Waiters
+1. **Register**: Fill out registration form with Hedera Account ID and/or Base wallet address
+2. **Get QR Code**: Receive a unique QR code linking to your payment page
+3. **Display**: Show the QR code to customers (print, digital display, or share the link)
+4. **Receive Tips**: Get HBAR sent directly to your wallet
+5. **Build Reputation**: Collect on-chain reviews that prove your service quality
 
-## Deployment
+### For Customers
+1. **Scan QR Code**: Use phone camera to scan waiter's QR code
+2. **Connect Wallet**: Connect your Hedera wallet (HashPack, Blade, etc.) via WalletConnect
+3. **Choose Amount**: Select or enter tip amount in HBAR
+4. **Write Review** (Optional): Leave a comment about the service
+5. **Send Tip**: Confirm the transaction in your wallet
+6. **Done!**: Tip is sent instantly, review is recorded on blockchain forever
 
-This project is configured for automatic deployment to GitHub Pages.
-
-### Automatic Deployment
-
-The project uses GitHub Actions for automatic deployment. When you push to the `main` branch, the application will be automatically built and deployed to GitHub Pages.
-
-### Manual Deployment
-
-If you prefer manual deployment:
-
-```bash
-npm run deploy
-```
-
-This command builds the project and deploys it to GitHub Pages using the `gh-pages` package.
-
-### Repository Setup
-
-1. Create a new repository on GitHub named `ezcryptotips`
-2. Push your code to the `main` branch
-3. Go to repository Settings > Pages
-4. Set source to "GitHub Actions"
-
-The application will be available at: `https://yourusername.github.io/ezcryptotips/`
-
-### Firebase Configuration
-
-For full functionality, you need to set up Firebase:
-
-1. Create a Firebase project at https://console.firebase.google.com/
-2. Enable Firestore Database
-3. Add your Firebase config to environment variables or replace the placeholder in `src/App.tsx`
-
-## Project Structure
-
-```
-src/
-├── App.tsx          # Main application component with QR code generation
-├── main.tsx         # Application entry point
-├── index.css        # Global styles
-└── TipSplitter.sol  # Smart contract (reference)
-
-public/              # Static assets
-.github/
-└── workflows/
-    └── deploy.yml   # GitHub Actions workflow
-```
+### Behind the Scenes
+- **Payment**: HBAR transfer executed on Hedera network via your connected wallet
+- **Review Storage**: If a review is provided, it's submitted to Hedera Consensus Service (HCS)
+- **Blockchain Record**: Both payment and review are permanently recorded with consensus timestamps
+- **Proof-of-Service**: Reviews create verifiable on-chain reputation for service workers
 
 ## License
 

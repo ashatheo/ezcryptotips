@@ -1,38 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  QrCode, 
-  Wallet, 
-  User, 
-  Share2, 
-  Zap, 
+import {
+  QrCode,
+  Wallet,
+  User,
+  Share2,
+  Zap,
   Coins,
   ArrowLeft,
-  Download
+  Download,
+  Link as LinkIcon
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
-import { initializeApp } from 'firebase/app';
-import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
+import {
+  collection,
+  addDoc,
   getDoc,
   doc,
-  serverTimestamp 
+  serverTimestamp
 } from 'firebase/firestore';
-
-// --- FIREBASE CONFIGURATION ---
-const firebaseConfig = JSON.parse(
-  typeof __firebase_config !== 'undefined' ? __firebase_config : '{}'
-);
-
-// Initialization (safe check for preview environment)
-let db: any;
-try {
-  const app = initializeApp(firebaseConfig);
-  db = getFirestore(app);
-} catch (e) {
-  console.warn("Firebase not initialized (likely missing config in preview). Using Mock Mode.");
-}
+import { useHederaWallet, type ReviewData } from './HederaWalletContext';
+import { useAuth } from './contexts/AuthContext';
+import { db } from './firebase';
+import { StarRating } from './components/StarRating';
+import { useWaiterRating } from './hooks/useWaiterRating';
 
 // --- CONSTANTS ---
 const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'ez-crypto-tips';
@@ -77,20 +67,54 @@ const MOCK_WAITER: WaiterProfile = {
 };
 
 export default function App() {
+  // Auth Hook
+  const { user, profile, login, register, logout, loading: authLoading, updateUserProfile } = useAuth();
+
+  // Hedera Wallet Hook
+  const {
+    accountId: hederaAccountId,
+    isConnected: isHederaConnected,
+    isConnecting: isHederaConnecting,
+    connectWallet: connectHederaWallet,
+    disconnectWallet: disconnectHederaWallet,
+    sendHbarTransfer,
+    submitReview,
+    error: hederaError
+  } = useHederaWallet();
+
   // State
-  const [view, setView] = useState<'landing' | 'register' | 'qr' | 'pay' | 'success'>('landing');
+  const [view, setView] = useState<'landing' | 'register' | 'login' | 'dashboard' | 'qr' | 'pay' | 'success' | 'edit-profile'>('landing');
   const [waiterData, setWaiterData] = useState<WaiterProfile | null>(null);
   const [amount, setAmount] = useState<string>('');
-  const [review, setReview] = useState<string>(''); 
+  const [review, setReview] = useState<string>('');
+  const [rating, setRating] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [selectedToken, setSelectedToken] = useState<TokenOption>(AVAILABLE_TOKENS[0]);
+  const [transactionId, setTransactionId] = useState<string>('');
+
+  // Rating hooks - called at top level to comply with React Hooks rules
+  const { averageRating: dashboardRating, totalReviews: dashboardTotalReviews, totalRatings: dashboardTotalRatings, isLoading: dashboardRatingLoading } = useWaiterRating(user?.uid);
+  const { averageRating: paymentRating, totalRatings: paymentTotalRatings, isLoading: paymentRatingLoading } = useWaiterRating(waiterData?.id);
+
+  // --- AUTO-LOGIN TO DASHBOARD ---
+  useEffect(() => {
+    // If user is logged in, redirect to dashboard (from landing or register views)
+    // Only redirect when not loading and both user and profile are ready
+    if (!authLoading && user && profile && (view === 'landing' || view === 'register' || view === 'login')) {
+      setView('dashboard');
+    }
+    // If user is logged out and on dashboard, redirect to landing
+    if (!authLoading && !user && view === 'dashboard') {
+      setView('landing');
+    }
+  }, [authLoading, user, profile, view]);
 
   // --- URL PARAMETER HANDLING ---
   useEffect(() => {
     // Check for waiter ID in URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const waiterId = urlParams.get('waiter');
-    
+
     if (waiterId) {
       // Try to load waiter data from Firebase or use mock
       loadWaiterProfile(waiterId);
@@ -131,18 +155,38 @@ export default function App() {
 
   // Registration Form State
   const [regForm, setRegForm] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
     name: '',
     restaurant: '',
     hederaId: '',
     baseAddress: '',
   });
 
+  // Login Form State
+  const [loginForm, setLoginForm] = useState({
+    email: '',
+    password: '',
+  });
+
+  // Edit Profile Form State
+  const [editForm, setEditForm] = useState({
+    name: '',
+    restaurant: '',
+    hederaId: '',
+    baseAddress: '',
+    bio: '',
+    photoURL: '',
+  });
+
   // --- NAVIGATION HELPERS ---
   
   const openPaymentPage = (profile: WaiterProfile) => {
     setWaiterData(profile);
-    setAmount(''); 
-    setReview(''); 
+    setAmount('');
+    setReview('');
+    setRating(0);
     setSelectedToken(AVAILABLE_TOKENS[0]); // Reset to default
     setView('pay');
   };
@@ -154,33 +198,91 @@ export default function App() {
     setLoading(true);
 
     try {
-      // Basic validation: ensure at least one payment method is provided
+      // Validation
+      if (!regForm.email || !regForm.password) {
+        alert("Please provide email and password.");
+        setLoading(false);
+        return;
+      }
+
+      if (regForm.password !== regForm.confirmPassword) {
+        alert("Passwords do not match.");
+        setLoading(false);
+        return;
+      }
+
+      if (regForm.password.length < 6) {
+        alert("Password must be at least 6 characters.");
+        setLoading(false);
+        return;
+      }
+
       if (!regForm.hederaId && !regForm.baseAddress) {
         alert("Please provide at least one payment address (Hedera or Base).");
         setLoading(false);
         return;
       }
 
-      if (db) {
-        const docRef = await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'waiters'), {
-          ...regForm,
-          createdAt: serverTimestamp()
-        });
-        
-        const newProfile = { ...regForm, id: docRef.id };
-        setWaiterData(newProfile);
-        console.log(`Profile created! ID: ${docRef.id}`);
-        setView('qr'); // Show QR code instead of payment page
-      } else {
-        // Mock mode - generate a unique ID
-        const mockId = 'mock-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-        const newProfile = { ...regForm, id: mockId };
-        setWaiterData(newProfile);
-        setView('qr'); // Show QR code instead of payment page
-      }
-    } catch (error) {
-      console.error("Error adding document: ", error);
-      alert("Registration error. Check console.");
+      // Register with Firebase Auth
+      await register(
+        regForm.email,
+        regForm.password,
+        {
+          name: regForm.name,
+          restaurant: regForm.restaurant,
+          hederaId: regForm.hederaId,
+          baseAddress: regForm.baseAddress
+        }
+      );
+
+      alert('Registration successful! Please check your email to verify your account.');
+
+      // Don't automatically redirect - let the AUTO-LOGIN effect handle it
+      // This ensures the profile is fully loaded before showing dashboard
+    } catch (error: any) {
+      console.error("Registration error: ", error);
+      alert(error.message || "Registration error. Check console.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Login handler
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      await login(loginForm.email, loginForm.password);
+      setView('dashboard');
+    } catch (error: any) {
+      console.error("Login error:", error);
+      alert(error.message || "Login failed. Please check your credentials.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update Profile handler
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      await updateUserProfile({
+        name: editForm.name,
+        restaurant: editForm.restaurant,
+        hederaId: editForm.hederaId,
+        baseAddress: editForm.baseAddress,
+        bio: editForm.bio,
+        photoURL: editForm.photoURL,
+      });
+
+      alert('Profile updated successfully!');
+      setView('dashboard');
+    } catch (error: any) {
+      console.error("Update profile error:", error);
+      alert(error.message || "Failed to update profile.");
     } finally {
       setLoading(false);
     }
@@ -190,7 +292,7 @@ export default function App() {
 
   const handlePayment = async () => {
     if (!amount || parseFloat(amount) <= 0) return;
-    
+
     // Check if waiter has the address for selected token
     const targetAddress = waiterData ? waiterData[selectedToken.addressKey] : null;
     if (!targetAddress) {
@@ -200,15 +302,12 @@ export default function App() {
 
     setLoading(true);
 
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
     try {
       await processPayment(targetAddress);
       setView('success');
-    } catch (error) {
+    } catch (error: any) {
       console.error("Payment cancelled or failed", error);
-      alert("Payment failed. See console.");
+      alert(error.message || "Payment failed. Please check console for details.");
     } finally {
       setLoading(false);
     }
@@ -220,68 +319,364 @@ export default function App() {
     console.log(`Token: ${selectedToken.symbol}`);
     console.log(`Recipient: ${address}`);
     console.log(`Amount: ${amount}`);
-    
-    let simulationMsg = "";
 
     if (selectedToken.id === 'hbar') {
-       simulationMsg = `[HEDERA SIMULATION]\nCall Hedera SDK/HashPack\nTransfer ${amount} HBAR to ${address}`;
-    } else if (selectedToken.id === 'usdt_base') {
-       simulationMsg = `[BASE SIMULATION]\nCall Wagmi/MetaMask (Base Chain)\nTransfer ${amount} USDT to ${address}`;
-    }
+      // Real Hedera transaction
+      if (!isHederaConnected) {
+        throw new Error('Please connect your Hedera wallet first');
+      }
 
-    console.log(simulationMsg);
-    // alert(simulationMsg); // Uncomment for explicit popup during demo
+      console.log('[HEDERA REAL TRANSACTION]');
+      console.log(`Transferring ${amount} HBAR from ${hederaAccountId} to ${address}`);
+
+      const txId = await sendHbarTransfer(address, parseFloat(amount));
+      setTransactionId(txId);
+
+      console.log(`Transaction successful! ID: ${txId}`);
+
+      // Submit review to HCS and save to Firebase if review text or rating is provided
+      if ((review && review.trim()) || rating > 0) {
+        try {
+          console.log('[HCS] Submitting review to blockchain...');
+
+          const reviewData: ReviewData = {
+            waiterName: waiterData?.name || 'Unknown',
+            waiterId: waiterData?.id || 'unknown',
+            restaurant: waiterData?.restaurant || 'Unknown',
+            rating: rating > 0 ? rating : undefined,
+            comment: review.trim(),
+            tipAmount: parseFloat(amount),
+            timestamp: Date.now(),
+          };
+
+          const reviewTxId = await submitReview(reviewData);
+          console.log(`[HCS] Review submitted! Transaction ID: ${reviewTxId}`);
+
+          // Save review to Firebase
+          if (db && waiterData?.id) {
+            try {
+              await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'reviews'), {
+                waiterId: waiterData.id,
+                waiterName: waiterData.name,
+                restaurant: waiterData.restaurant,
+                rating: rating > 0 ? rating : null,
+                comment: review.trim(),
+                tipAmount: parseFloat(amount),
+                transactionId: reviewTxId,
+                timestamp: serverTimestamp(),
+                network: 'Hedera',
+              });
+              console.log('[Firebase] Review saved successfully');
+            } catch (firebaseError) {
+              console.error('[Firebase] Failed to save review:', firebaseError);
+            }
+          }
+        } catch (reviewError) {
+          console.error('[HCS] Failed to submit review:', reviewError);
+          // Don't throw - payment was successful, review is optional
+        }
+      }
+    } else if (selectedToken.id === 'usdt_base') {
+      // For Base network - still simulation (you can integrate wagmi/MetaMask later)
+      const simulationMsg = `[BASE SIMULATION]\nCall Wagmi/MetaMask (Base Chain)\nTransfer ${amount} USDT to ${address}`;
+      console.log(simulationMsg);
+
+      // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
   };
 
   // --- VIEWS ---
 
   if (view === 'landing') {
     return (
-      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6 font-sans relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
-          <div className="absolute -top-[20%] -right-[20%] w-[60%] h-[60%] bg-white/5 rounded-full blur-3xl"></div>
-          <div className="absolute top-[40%] -left-[10%] w-[40%] h-[40%] bg-[#00eb78]/10 rounded-full blur-3xl"></div>
-        </div>
+      <div className="min-h-screen bg-black text-white font-sans">
+        {/* Hero Section */}
+        <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+          {/* Background Effects */}
+          <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
+            <div className="absolute -top-[20%] -right-[20%] w-[60%] h-[60%] bg-white/5 rounded-full blur-3xl"></div>
+            <div className="absolute top-[40%] -left-[10%] w-[40%] h-[40%] bg-[#00eb78]/10 rounded-full blur-3xl"></div>
+            <div className="absolute bottom-[10%] right-[20%] w-[30%] h-[30%] bg-[#0052FF]/10 rounded-full blur-3xl"></div>
+          </div>
 
-        <div className="max-w-md w-full text-center space-y-10 relative z-10">
-          <div className="flex justify-center mb-6">
-            <div className="border border-white/20 p-6 rounded-3xl bg-white/5 backdrop-blur-md shadow-2xl">
-              <QrCode size={64} color={HEDERA_GREEN} />
+          <div className="max-w-6xl mx-auto px-6 py-20 relative z-10">
+            <div className="text-center space-y-8">
+              {/* Logo */}
+              <div className="flex justify-center mb-6">
+                <div className="border border-white/20 p-6 rounded-3xl bg-white/5 backdrop-blur-md shadow-2xl">
+                  <QrCode size={64} color={HEDERA_GREEN} />
+                </div>
+              </div>
+
+              {/* Main Heading */}
+              <h1 className="text-6xl md:text-7xl font-bold tracking-tighter text-white mb-4">
+                The Future of Tipping
+              </h1>
+
+              <p className="text-xl md:text-2xl text-gray-400 max-w-3xl mx-auto leading-relaxed">
+                Instant crypto tips on <span className="text-[#00eb78] font-semibold">Hedera</span> and <span className="text-[#0052FF] font-semibold">Base</span> networks.
+                Direct to waiters. Zero intermediaries. Built on blockchain.
+              </p>
+
+              {/* CTA Buttons */}
+              <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8 max-w-2xl mx-auto">
+                {!user ? (
+                  <>
+                    <button
+                      onClick={() => setView('register')}
+                      className="flex-1 bg-[#00eb78] hover:bg-[#00c96d] text-black font-bold py-4 px-8 rounded-full transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_20px_rgba(0,235,120,0.3)] flex items-center justify-center gap-2"
+                    >
+                      <User size={20} />
+                      Register as Waiter
+                    </button>
+
+                    <button
+                      onClick={() => openPaymentPage(MOCK_WAITER)}
+                      className="flex-1 bg-transparent hover:bg-white/10 text-white font-semibold py-4 px-8 rounded-full border border-white/30 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Zap size={20} color={HEDERA_GREEN} />
+                      Try Demo
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setView('dashboard')}
+                    className="flex-1 bg-[#00eb78] hover:bg-[#00c96d] text-black font-bold py-4 px-8 rounded-full transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_20px_rgba(0,235,120,0.3)] flex items-center justify-center gap-2"
+                  >
+                    <User size={20} />
+                    Go to Dashboard
+                  </button>
+                )}
+              </div>
+
+              {user && (
+                <button
+                  onClick={() => setView('login')}
+                  className="text-gray-400 hover:text-white transition-colors text-sm"
+                >
+                  Sign in with different account
+                </button>
+              )}
             </div>
           </div>
-          
-          <div>
-            <h1 className="text-5xl font-bold tracking-tighter text-white mb-2">
-              Ez Crypto Tips
-            </h1>
-            <p className="text-gray-400 font-mono tracking-widest text-xs uppercase">
-              <span style={{color: HEDERA_GREEN}}>Hedera</span> • <span style={{color: BASE_BLUE}}>Base</span>
+        </section>
+
+        {/* Features Section */}
+        <section className="py-20 px-6 bg-[#181818]/50 backdrop-blur-sm">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">Why Ez Crypto Tips?</h2>
+              <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+                Modern tipping solution built for the digital age
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-8">
+              {/* Feature 1 */}
+              <div className="bg-black/40 border border-gray-800 rounded-3xl p-8 hover:border-[#00eb78]/50 transition-all">
+                <div className="w-14 h-14 bg-[#00eb78]/10 rounded-2xl flex items-center justify-center mb-6">
+                  <Zap size={28} color={HEDERA_GREEN} />
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-3">Instant Transfers</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  Tips arrive in seconds, not days. No waiting for payment processing or bank transfers.
+                </p>
+              </div>
+
+              {/* Feature 2 */}
+              <div className="bg-black/40 border border-gray-800 rounded-3xl p-8 hover:border-[#0052FF]/50 transition-all">
+                <div className="w-14 h-14 bg-[#0052FF]/10 rounded-2xl flex items-center justify-center mb-6">
+                  <Coins size={28} color={BASE_BLUE} />
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-3">Multi-Chain Support</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  Accept tips on Hedera (HBAR) and Base (USDT). Choose what works best for you.
+                </p>
+              </div>
+
+              {/* Feature 3 */}
+              <div className="bg-black/40 border border-gray-800 rounded-3xl p-8 hover:border-[#00eb78]/50 transition-all">
+                <div className="w-14 h-14 bg-[#00eb78]/10 rounded-2xl flex items-center justify-center mb-6">
+                  <QrCode size={28} color={HEDERA_GREEN} />
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-3">Simple QR Codes</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  One QR code, unlimited tips. Customers scan and pay in seconds. No apps required.
+                </p>
+              </div>
+
+              {/* Feature 4 */}
+              <div className="bg-black/40 border border-gray-800 rounded-3xl p-8 hover:border-[#00eb78]/50 transition-all">
+                <div className="w-14 h-14 bg-[#00eb78]/10 rounded-2xl flex items-center justify-center mb-6">
+                  <Share2 size={28} color={HEDERA_GREEN} />
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-3">Direct to Your Wallet</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  Tips go directly to your wallet with only 5% platform fee. No banks, no payment processors, minimal delays.
+                </p>
+              </div>
+
+              {/* Feature 5 */}
+              <div className="bg-black/40 border border-gray-800 rounded-3xl p-8 hover:border-[#0052FF]/50 transition-all">
+                <div className="w-14 h-14 bg-[#0052FF]/10 rounded-2xl flex items-center justify-center mb-6">
+                  <svg className="w-7 h-7" fill="none" stroke={BASE_BLUE} viewBox="0 0 24 24" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-3">Blockchain Security</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  Every transaction is recorded on-chain. Transparent, secure, and verifiable.
+                </p>
+              </div>
+
+              {/* Feature 6 */}
+              <div className="bg-black/40 border border-gray-800 rounded-3xl p-8 hover:border-[#00eb78]/50 transition-all">
+                <div className="w-14 h-14 bg-[#00eb78]/10 rounded-2xl flex items-center justify-center mb-6">
+                  <svg className="w-7 h-7" fill="none" stroke={HEDERA_GREEN} viewBox="0 0 24 24" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-3">Rating System</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  Build your reputation with customer reviews and star ratings stored on blockchain.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Stats Section */}
+        <section className="py-20 px-6 bg-gradient-to-r from-[#00eb78]/5 to-[#0052FF]/5">
+          <div className="max-w-6xl mx-auto">
+            <div className="grid md:grid-cols-2 gap-12 items-center">
+              <div>
+                <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+                  More Tips, More Often
+                </h2>
+                <p className="text-xl text-gray-400 leading-relaxed mb-6">
+                  QR code payments make tipping easier than ever. Customers are more likely to tip when the process is simple and convenient.
+                </p>
+                <p className="text-gray-400 leading-relaxed">
+                  Our platform removes friction from the tipping process - no need to calculate percentages, no handling cash, just scan and pay.
+                </p>
+              </div>
+
+              <div className="bg-black/40 border border-gray-800 rounded-3xl p-12 text-center">
+                <div className="mb-6">
+                  <div className="text-7xl md:text-8xl font-bold bg-gradient-to-r from-[#00eb78] to-[#0052FF] bg-clip-text text-transparent">
+                    +18%
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-3">Average Tip Increase</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  Waiters using QR code tipping see an average 18% increase in tips thanks to the simplicity and convenience of the payment process.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* How It Works Section */}
+        <section className="py-20 px-6">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">How It Works</h2>
+              <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+                Get started in three simple steps
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-12">
+              {/* Step 1 */}
+              <div className="text-center">
+                <div className="w-20 h-20 bg-gradient-to-br from-[#00eb78] to-[#00c96d] rounded-full flex items-center justify-center mx-auto mb-6 text-3xl font-bold text-black">
+                  1
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-3">Register</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  Create your account and add your crypto wallet addresses (Hedera or Base)
+                </p>
+              </div>
+
+              {/* Step 2 */}
+              <div className="text-center">
+                <div className="w-20 h-20 bg-gradient-to-br from-[#0052FF] to-[#0041CC] rounded-full flex items-center justify-center mx-auto mb-6 text-3xl font-bold text-white">
+                  2
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-3">Get Your QR</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  Download your personalized QR code and display it at your workplace
+                </p>
+              </div>
+
+              {/* Step 3 */}
+              <div className="text-center">
+                <div className="w-20 h-20 bg-gradient-to-br from-[#00eb78] to-[#00c96d] rounded-full flex items-center justify-center mx-auto mb-6 text-3xl font-bold text-black">
+                  3
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-3">Receive Tips</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  Customers scan your QR code and send tips directly to your wallet
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Final CTA Section */}
+        <section className="py-20 px-6 bg-gradient-to-br from-[#00eb78]/10 to-[#0052FF]/10">
+          <div className="max-w-4xl mx-auto text-center">
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+              Ready to Start Earning?
+            </h2>
+            <p className="text-xl text-gray-400 mb-4 max-w-2xl mx-auto">
+              Join waiters around the world who are already receiving crypto tips
+            </p>
+            <p className="text-sm text-gray-500 mb-10">
+              Only 5% platform fee · No hidden charges · Instant payouts
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-2xl mx-auto">
+              {!user ? (
+                <>
+                  <button
+                    onClick={() => setView('register')}
+                    className="flex-1 bg-[#00eb78] hover:bg-[#00c96d] text-black font-bold py-4 px-8 rounded-full transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_20px_rgba(0,235,120,0.3)] flex items-center justify-center gap-2"
+                  >
+                    <User size={20} />
+                    Create Account - It's Free
+                  </button>
+
+                  <button
+                    onClick={() => setView('login')}
+                    className="flex-1 bg-transparent hover:bg-white/10 text-white font-semibold py-4 px-8 rounded-full border border-white/30 transition-all flex items-center justify-center gap-2"
+                  >
+                    <User size={20} />
+                    Sign In
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setView('dashboard')}
+                  className="flex-1 bg-[#00eb78] hover:bg-[#00c96d] text-black font-bold py-4 px-8 rounded-full transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_20px_rgba(0,235,120,0.3)] flex items-center justify-center gap-2"
+                >
+                  <User size={20} />
+                  Go to Dashboard
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Footer */}
+        <footer className="py-8 px-6 border-t border-gray-800">
+          <div className="max-w-6xl mx-auto text-center">
+            <p className="text-gray-500 text-sm">
+              Powered by <span className="text-[#00eb78]">Hedera</span> and <span className="text-[#0052FF]">Base</span>
             </p>
           </div>
-          
-          <p className="text-gray-400 text-lg leading-relaxed font-light">
-            The future of tipping. Instant. Direct. <br/>
-            Multi-chain support.
-          </p>
-
-          <div className="grid gap-4 pt-8">
-            <button 
-              onClick={() => setView('register')}
-              className="w-full bg-[#00eb78] hover:bg-[#00c96d] text-black font-bold py-4 px-6 rounded-full transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-[0_0_20px_rgba(0,235,120,0.3)] flex items-center justify-center gap-2"
-            >
-              <User size={20} />
-              I am a Waiter (Create QR)
-            </button>
-            
-            <button 
-              onClick={() => openPaymentPage(MOCK_WAITER)}
-              className="w-full bg-transparent hover:bg-white/10 text-white font-semibold py-4 px-6 rounded-full border border-white/30 transition-all flex items-center justify-center gap-2"
-            >
-              <Zap size={20} color={HEDERA_GREEN} />
-              Demo Payment (Guest)
-            </button>
-          </div>
-        </div>
+        </footer>
       </div>
     );
   }
@@ -376,10 +771,51 @@ export default function App() {
           
           <form onSubmit={handleRegister} className="p-8 space-y-4">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Your Name</label>
-              <input 
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Email</label>
+              <input
                 required
-                type="text" 
+                type="email"
+                className="w-full bg-black text-white p-4 border border-gray-700 rounded-xl focus:border-[#00eb78] outline-none transition-all placeholder-gray-600"
+                placeholder="your@email.com"
+                value={regForm.email}
+                onChange={e => setRegForm({...regForm, email: e.target.value})}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Password</label>
+              <input
+                required
+                type="password"
+                className="w-full bg-black text-white p-4 border border-gray-700 rounded-xl focus:border-[#00eb78] outline-none transition-all placeholder-gray-600"
+                placeholder="••••••••"
+                value={regForm.password}
+                onChange={e => setRegForm({...regForm, password: e.target.value})}
+              />
+              <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Confirm Password</label>
+              <input
+                required
+                type="password"
+                className="w-full bg-black text-white p-4 border border-gray-700 rounded-xl focus:border-[#00eb78] outline-none transition-all placeholder-gray-600"
+                placeholder="••••••••"
+                value={regForm.confirmPassword}
+                onChange={e => setRegForm({...regForm, confirmPassword: e.target.value})}
+              />
+            </div>
+
+            <div className="pt-4 border-t border-gray-800">
+              <p className="text-gray-400 text-sm mb-4">Profile Information:</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Your Name</label>
+              <input
+                required
+                type="text"
                 className="w-full bg-black text-white p-4 border border-gray-700 rounded-xl focus:border-[#00eb78] outline-none transition-all placeholder-gray-600"
                 placeholder="Alex"
                 value={regForm.name}
@@ -427,12 +863,440 @@ export default function App() {
               </div>
             </div>
 
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={loading}
               className="w-full mt-6 bg-[#00eb78] hover:bg-[#00c96d] text-black font-bold py-4 px-6 rounded-xl transition-all shadow-[0_0_15px_rgba(0,235,120,0.2)] disabled:opacity-50"
             >
-              {loading ? 'Creating...' : 'Generate QR Code'}
+              {loading ? 'Creating Account...' : 'Create Account'}
+            </button>
+
+            <div className="text-center pt-4">
+              <p className="text-gray-500 text-sm">
+                Already have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => setView('login')}
+                  className="text-[#00eb78] hover:text-[#00c96d] font-semibold transition-colors"
+                >
+                  Login
+                </button>
+              </p>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === 'login') {
+    return (
+      <div className="min-h-screen bg-black flex flex-col p-6 font-sans">
+        <div className="max-w-md w-full mx-auto bg-[#181818] rounded-3xl border border-gray-800 overflow-hidden shadow-2xl">
+          <div className="p-8 border-b border-gray-800">
+            <button onClick={() => setView('landing')} className="text-gray-400 hover:text-white mb-6 transition-colors">
+              <ArrowLeft size={24} />
+            </button>
+            <h2 className="text-3xl font-bold text-white mb-1">Waiter Login</h2>
+            <p className="text-gray-400">Access your dashboard</p>
+          </div>
+
+          <form onSubmit={handleLogin} className="p-8 space-y-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Email</label>
+              <input
+                required
+                type="email"
+                className="w-full bg-black text-white p-4 border border-gray-700 rounded-xl focus:border-[#00eb78] outline-none transition-all placeholder-gray-600"
+                placeholder="your@email.com"
+                value={loginForm.email}
+                onChange={e => setLoginForm({...loginForm, email: e.target.value})}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Password</label>
+              <input
+                required
+                type="password"
+                className="w-full bg-black text-white p-4 border border-gray-700 rounded-xl focus:border-[#00eb78] outline-none transition-all placeholder-gray-600"
+                placeholder="••••••••"
+                value={loginForm.password}
+                onChange={e => setLoginForm({...loginForm, password: e.target.value})}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full mt-6 bg-[#00eb78] hover:bg-[#00c96d] text-black font-bold py-4 px-6 rounded-xl transition-all shadow-[0_0_15px_rgba(0,235,120,0.2)] disabled:opacity-50"
+            >
+              {loading ? 'Logging in...' : 'Login'}
+            </button>
+
+            <div className="text-center pt-4">
+              <p className="text-gray-500 text-sm">
+                Don't have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => setView('register')}
+                  className="text-[#00eb78] hover:text-[#00c96d] font-semibold transition-colors"
+                >
+                  Register
+                </button>
+              </p>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === 'dashboard') {
+    if (authLoading || !user || !profile) {
+      return (
+        <div className="min-h-screen bg-black flex items-center justify-center">
+          <p className="text-white">Loading profile...</p>
+        </div>
+      );
+    }
+
+    const qrUrl = profile.qrCodeUrl || generateQRUrl(user.uid);
+
+    const downloadQRCode = () => {
+      const svg = document.getElementById('dashboard-qr-code');
+      if (!svg) return;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024;
+      canvas.height = 1024;
+      const ctx = canvas.getContext('2d');
+
+      if (!ctx) return;
+
+      // Convert SVG to canvas
+      const svgData = new XMLSerializer().serializeToString(svg);
+      const img = new Image();
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+
+      img.onload = () => {
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const link = document.createElement('a');
+            link.download = `${profile.name}-qr-code.png`;
+            link.href = URL.createObjectURL(blob);
+            link.click();
+          }
+        });
+      };
+
+      img.src = url;
+    };
+
+    return (
+      <div className="min-h-screen bg-black flex flex-col p-6 font-sans">
+        <div className="max-w-4xl w-full mx-auto">
+          {/* Header */}
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <h1 className="text-3xl font-bold text-white">Welcome, {profile.name}! 👋</h1>
+              <p className="text-gray-400">{profile.restaurant}</p>
+            </div>
+            <div className="flex gap-4">
+              <button
+                onClick={() => {
+                  // Populate edit form with current profile data
+                  setEditForm({
+                    name: profile.name,
+                    restaurant: profile.restaurant,
+                    hederaId: profile.hederaId,
+                    baseAddress: profile.baseAddress || '',
+                    bio: profile.bio || '',
+                    photoURL: profile.photoURL || '',
+                  });
+                  setView('edit-profile');
+                }}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                Edit Profile
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await logout();
+                    setView('landing');
+                  } catch (error) {
+                    console.error('Logout error:', error);
+                    // Still redirect to landing even if logout fails
+                    setView('landing');
+                  }
+                }}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* QR Code Card */}
+            <div className="bg-[#181818] rounded-3xl border border-gray-800 p-8">
+              <h2 className="text-2xl font-bold text-white mb-6">Your QR Code</h2>
+
+              <div className="bg-white p-6 rounded-2xl shadow-2xl mb-6">
+                <QRCode
+                  id="dashboard-qr-code"
+                  value={qrUrl}
+                  size={256}
+                  style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                  viewBox={`0 0 256 256`}
+                />
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={downloadQRCode}
+                  className="w-full bg-[#00eb78] hover:bg-[#00c96d] text-black font-bold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2"
+                >
+                  <Download size={18} />
+                  Download QR Code
+                </button>
+              </div>
+            </div>
+
+            {/* Share Link Card */}
+            <div className="bg-[#181818] rounded-3xl border border-gray-800 p-8">
+              <h2 className="text-2xl font-bold text-white mb-6">Share Link</h2>
+
+              <div className="bg-black p-4 rounded-xl border border-gray-800 mb-4">
+                <p className="text-xs text-gray-500 mb-2">Payment URL:</p>
+                <p className="font-mono text-xs text-gray-300 break-all">{qrUrl}</p>
+              </div>
+
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(qrUrl);
+                  alert('Link copied to clipboard!');
+                }}
+                className="w-full bg-[#00eb78] hover:bg-[#00c96d] text-black font-bold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2"
+              >
+                <Share2 size={18} />
+                Copy Link
+              </button>
+
+              <div className="mt-8 pt-8 border-t border-gray-800">
+                <h3 className="text-lg font-bold text-white mb-4">Profile Info</h3>
+
+                {/* Profile Photo */}
+                {profile.photoURL && (
+                  <div className="flex justify-center mb-4">
+                    <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-[#00eb78]">
+                      <img src={profile.photoURL} alt={profile.name} className="w-full h-full object-cover" />
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-3 text-sm">
+                  <div>
+                    <span className="text-gray-500">Name:</span>
+                    <span className="text-white ml-2">{profile.name}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Restaurant:</span>
+                    <span className="text-white ml-2">{profile.restaurant}</span>
+                  </div>
+                  {profile.bio && (
+                    <div>
+                      <span className="text-gray-500">Bio:</span>
+                      <p className="text-white mt-1">{profile.bio}</p>
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-gray-500">Hedera ID:</span>
+                    <span className="text-white ml-2 font-mono text-xs">{profile.hederaId}</span>
+                  </div>
+                  {profile.baseAddress && (
+                    <div>
+                      <span className="text-gray-500">Base Address:</span>
+                      <span className="text-white ml-2 font-mono text-xs">{profile.baseAddress}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-8 pt-8 border-t border-gray-800">
+                <h3 className="text-lg font-bold text-white mb-4">Your Rating</h3>
+                {dashboardRatingLoading ? (
+                  <p className="text-gray-500 text-sm">Loading rating...</p>
+                ) : dashboardTotalRatings > 0 ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <StarRating
+                        rating={Math.round(dashboardRating)}
+                        onRatingChange={() => {}}
+                        size={24}
+                        color="#00eb78"
+                        readOnly
+                      />
+                      <div className="flex flex-col">
+                        <span className="text-white font-bold text-lg">{dashboardRating.toFixed(1)}</span>
+                        <span className="text-gray-500 text-xs">{dashboardTotalRatings} {dashboardTotalRatings === 1 ? 'rating' : 'ratings'}</span>
+                      </div>
+                    </div>
+                    <p className="text-gray-500 text-xs">
+                      Based on {dashboardTotalReviews} {dashboardTotalReviews === 1 ? 'review' : 'reviews'}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-sm">No ratings yet</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => openPaymentPage({
+                id: user.uid,
+                name: profile.name,
+                restaurant: profile.restaurant,
+                hederaId: profile.hederaId,
+                baseAddress: profile.baseAddress
+              })}
+              className="text-gray-400 hover:text-white transition-colors text-sm"
+            >
+              Test Payment Page →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === 'edit-profile') {
+    if (!user || !profile) {
+      return (
+        <div className="min-h-screen bg-black flex items-center justify-center">
+          <p className="text-white">Loading...</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-black flex flex-col p-6 font-sans">
+        <div className="max-w-md w-full mx-auto bg-[#181818] rounded-3xl border border-gray-800 overflow-hidden shadow-2xl">
+          <div className="p-8 border-b border-gray-800">
+            <button onClick={() => setView('dashboard')} className="text-gray-400 hover:text-white mb-6 transition-colors">
+              <ArrowLeft size={24} />
+            </button>
+            <h2 className="text-3xl font-bold text-white mb-1">Edit Profile</h2>
+            <p className="text-gray-400">Update your information</p>
+          </div>
+
+          <form onSubmit={handleUpdateProfile} className="p-8 space-y-4">
+            {/* Profile Photo */}
+            <div className="flex flex-col items-center mb-6">
+              <div className="w-24 h-24 bg-black rounded-full border border-gray-700 flex items-center justify-center text-3xl font-bold text-white mb-4 overflow-hidden">
+                {editForm.photoURL ? (
+                  <img src={editForm.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  profile.name.charAt(0)
+                )}
+              </div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Photo URL</label>
+              <input
+                type="url"
+                className="w-full bg-black text-white p-3 border border-gray-700 rounded-xl focus:border-[#00eb78] outline-none transition-all placeholder-gray-600 text-sm"
+                placeholder="https://example.com/photo.jpg"
+                value={editForm.photoURL}
+                onChange={e => setEditForm({...editForm, photoURL: e.target.value})}
+              />
+              <p className="text-xs text-gray-500 mt-1">Enter a URL to your profile photo</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Your Name</label>
+              <input
+                required
+                type="text"
+                className="w-full bg-black text-white p-4 border border-gray-700 rounded-xl focus:border-[#00eb78] outline-none transition-all placeholder-gray-600"
+                placeholder="Alex"
+                value={editForm.name}
+                onChange={e => setEditForm({...editForm, name: e.target.value})}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Restaurant / Venue</label>
+              <input
+                required
+                type="text"
+                className="w-full bg-black text-white p-4 border border-gray-700 rounded-xl focus:border-[#00eb78] outline-none transition-all placeholder-gray-600"
+                placeholder="Burger Heroes"
+                value={editForm.restaurant}
+                onChange={e => setEditForm({...editForm, restaurant: e.target.value})}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Bio (Optional)</label>
+              <textarea
+                className="w-full bg-black text-white p-4 border border-gray-700 rounded-xl focus:border-[#00eb78] outline-none transition-all placeholder-gray-600 resize-none"
+                placeholder="Tell people about yourself..."
+                rows={3}
+                value={editForm.bio}
+                onChange={e => setEditForm({...editForm, bio: e.target.value})}
+              />
+            </div>
+
+            <div className="pt-4 border-t border-gray-800">
+              <p className="text-gray-400 text-sm mb-4">Payment Addresses:</p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#00eb78] mb-1">Hedera Account ID</label>
+                  <input
+                    type="text"
+                    className="w-full bg-black text-white p-3 border border-gray-700 rounded-xl focus:border-[#00eb78] outline-none font-mono text-sm"
+                    placeholder="0.0.xxxxx"
+                    value={editForm.hederaId}
+                    onChange={e => setEditForm({...editForm, hederaId: e.target.value})}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#0052FF] mb-1">Base Address (EVM)</label>
+                  <input
+                    type="text"
+                    className="w-full bg-black text-white p-3 border border-gray-700 rounded-xl focus:border-[#0052FF] outline-none font-mono text-sm"
+                    placeholder="0x..."
+                    value={editForm.baseAddress}
+                    onChange={e => setEditForm({...editForm, baseAddress: e.target.value})}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full mt-6 bg-[#00eb78] hover:bg-[#00c96d] text-black font-bold py-4 px-6 rounded-xl transition-all shadow-[0_0_15px_rgba(0,235,120,0.2)] disabled:opacity-50"
+            >
+              {loading ? 'Saving...' : 'Save Changes'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setView('dashboard')}
+              className="w-full bg-transparent hover:bg-white/10 text-gray-400 font-medium py-3 px-6 rounded-xl transition-all"
+            >
+              Cancel
             </button>
           </form>
         </div>
@@ -458,7 +1322,23 @@ export default function App() {
                 {waiterData?.name.charAt(0)}
              </div>
              <h2 className="text-2xl font-bold text-white mb-1">{waiterData?.name}</h2>
-             <p className="text-gray-500 uppercase text-xs tracking-wider">{waiterData?.restaurant}</p>
+             <p className="text-gray-500 uppercase text-xs tracking-wider mb-3">{waiterData?.restaurant}</p>
+
+             {/* Waiter Rating Display */}
+             {!paymentRatingLoading && paymentTotalRatings > 0 && (
+               <div className="flex items-center justify-center gap-2 pt-3 border-t border-gray-800/50">
+                 <StarRating
+                   rating={Math.round(paymentRating)}
+                   onRatingChange={() => {}}
+                   size={18}
+                   color="#00eb78"
+                   readOnly
+                 />
+                 <span className="text-gray-400 text-sm">
+                   {paymentRating.toFixed(1)} ({paymentTotalRatings})
+                 </span>
+               </div>
+             )}
           </div>
 
           {/* Payment Form */}
@@ -503,8 +1383,8 @@ export default function App() {
             <div className="mb-8">
                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Tip Amount ({selectedToken.symbol})</label>
                <div className="grid grid-cols-3 gap-3 mb-4">
-                 {[5, 10, 20].map((val) => (
-                   <button 
+                 {(selectedToken.id === 'hbar' ? [50, 100, 200] : [5, 10, 20]).map((val) => (
+                   <button
                      key={val}
                      onClick={() => setAmount(val.toString())}
                      className={`py-3 rounded-xl font-medium transition-all border ${amount === val.toString() ? 'border-white bg-white text-black' : 'border-gray-700 bg-black text-gray-400 hover:border-gray-500'}`}
@@ -527,8 +1407,46 @@ export default function App() {
                </div>
             </div>
 
+            {/* Rating Section */}
+            <div className="mb-6">
+               <div className="flex items-center justify-between mb-3">
+                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">Rating (Optional)</label>
+                 {selectedToken.id === 'hbar' && isHederaConnected && rating > 0 && (
+                   <div className="flex items-center gap-1 text-xs text-[#00eb78]">
+                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                     </svg>
+                     <span className="font-medium">Saved to blockchain</span>
+                   </div>
+                 )}
+               </div>
+               <div className="flex items-center justify-center gap-2">
+                 <StarRating
+                   rating={rating}
+                   onRatingChange={setRating}
+                   size={32}
+                   color="#00eb78"
+                 />
+                 {rating > 0 && (
+                   <span className="text-gray-400 text-sm ml-2">
+                     {rating} {rating === 1 ? 'star' : 'stars'}
+                   </span>
+                 )}
+               </div>
+            </div>
+
             <div className="mb-8">
-               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Review (Optional)</label>
+               <div className="flex items-center justify-between mb-3">
+                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">Review (Optional)</label>
+                 {selectedToken.id === 'hbar' && isHederaConnected && review && (
+                   <div className="flex items-center gap-1 text-xs text-[#00eb78]">
+                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                     </svg>
+                     <span className="font-medium">Saved to blockchain</span>
+                   </div>
+                 )}
+               </div>
                <textarea
                     value={review}
                     onChange={(e) => setReview(e.target.value)}
@@ -536,17 +1454,68 @@ export default function App() {
                     placeholder="Great service!"
                     rows={2}
                />
+               {selectedToken.id === 'hbar' && isHederaConnected && (review || rating > 0) && (
+                 <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                   <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                   </svg>
+                   Your review will be permanently recorded on Hedera blockchain via HCS
+                 </p>
+               )}
             </div>
 
-            <button 
+            {/* Hedera Wallet Connection Status */}
+            {selectedToken.id === 'hbar' && (
+              <div className="mb-6">
+                {isHederaConnected ? (
+                  <div className="p-4 bg-green-900/20 border border-green-700 rounded-xl">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                        <span className="text-sm font-medium text-green-400">Hedera Wallet Connected</span>
+                      </div>
+                      <button
+                        onClick={disconnectHederaWallet}
+                        className="text-xs text-gray-400 hover:text-white transition-colors"
+                      >
+                        Disconnect
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-2 font-mono">
+                      Account: {hederaAccountId}
+                    </p>
+                  </div>
+                ) : (
+                  <button
+                    onClick={connectHederaWallet}
+                    disabled={isHederaConnecting}
+                    className="w-full bg-[#00eb78] hover:bg-[#00c96d] text-black font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,235,120,0.3)] disabled:opacity-50"
+                  >
+                    {isHederaConnecting ? (
+                      'Connecting...'
+                    ) : (
+                      <>
+                        <LinkIcon size={20} />
+                        Connect Hedera Wallet
+                      </>
+                    )}
+                  </button>
+                )}
+                {hederaError && (
+                  <p className="text-xs text-red-400 mt-2">{hederaError}</p>
+                )}
+              </div>
+            )}
+
+            <button
               onClick={handlePayment}
-              disabled={!amount || loading || !hasAddress}
+              disabled={!amount || loading || !hasAddress || (selectedToken.id === 'hbar' && !isHederaConnected)}
               className="w-full bg-white hover:bg-gray-200 text-black font-bold py-4 px-6 rounded-xl shadow-lg transform transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2"
             >
                {loading ? 'Processing...' : (
                  <>
                    <Wallet size={20} />
-                   Pay on {selectedToken.network}
+                   {selectedToken.id === 'hbar' && !isHederaConnected ? 'Connect Wallet First' : `Pay on ${selectedToken.network}`}
                  </>
                )}
             </button>
@@ -574,13 +1543,22 @@ export default function App() {
              <span className="text-gray-500 text-sm">Total Amount</span>
              <span className="font-bold text-2xl text-white">{amount} <span className="text-sm text-gray-500 font-normal">{selectedToken.symbol}</span></span>
            </div>
-           
+
            <div className="flex justify-between items-center">
              <span className="text-gray-500 text-sm">Network</span>
              <span className="font-mono text-xs text-black px-2 py-1 rounded" style={{backgroundColor: selectedToken.color}}>
                 {selectedToken.network}
              </span>
            </div>
+
+           {transactionId && selectedToken.id === 'hbar' && (
+             <div className="pt-4 border-t border-gray-800">
+               <span className="text-gray-500 text-sm block mb-2">Transaction ID</span>
+               <p className="font-mono text-xs text-gray-300 break-all bg-black p-3 rounded-lg">
+                 {transactionId}
+               </p>
+             </div>
+           )}
         </div>
 
         <button 

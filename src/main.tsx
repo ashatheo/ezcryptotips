@@ -1,10 +1,17 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import { HederaWalletProvider } from './HederaWalletContext'
+import { AuthProvider } from './contexts/AuthContext'
+import { auth, db } from './firebase'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <AuthProvider firebaseAuth={auth} firebaseDb={db}>
+      <HederaWalletProvider>
+        <App />
+      </HederaWalletProvider>
+    </AuthProvider>
   </React.StrictMode>,
 )
