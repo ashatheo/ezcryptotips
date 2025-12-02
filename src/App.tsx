@@ -23,6 +23,7 @@ import { useAuth } from './contexts/AuthContext';
 import { db } from './firebase';
 import { StarRating } from './components/StarRating';
 import { useWaiterRating } from './hooks/useWaiterRating';
+import { SparklesCore } from './components/ui/sparkles';
 
 // --- CONSTANTS ---
 const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'ez-crypto-tips';
@@ -393,6 +394,20 @@ export default function App() {
       <div className="min-h-screen bg-black text-white font-sans">
         {/* Hero Section */}
         <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+          {/* Sparkles Animation Background */}
+          <div className="absolute inset-0 w-full h-full z-0">
+            <SparklesCore
+              id="tsparticlesfullpage"
+              background="transparent"
+              minSize={0.6}
+              maxSize={1.4}
+              particleDensity={80}
+              className="w-full h-full"
+              particleColor="#00eb78"
+              speed={0.5}
+            />
+          </div>
+
           {/* Background Effects */}
           <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
             <div className="absolute -top-[20%] -right-[20%] w-[60%] h-[60%] bg-white/5 rounded-full blur-3xl"></div>
@@ -410,9 +425,21 @@ export default function App() {
               </div>
 
               {/* Main Heading */}
-              <h1 className="text-6xl md:text-7xl font-bold tracking-tighter text-white mb-4">
+              <h1 className="text-6xl md:text-7xl font-bold tracking-tighter text-white mb-4 relative">
                 The Future of Tipping
               </h1>
+
+              {/* Animated Gradient Lines */}
+              <div className="w-full max-w-2xl mx-auto h-32 relative mb-8">
+                {/* Gradients */}
+                <div className="absolute inset-x-20 top-0 bg-gradient-to-r from-transparent via-[#00eb78] to-transparent h-[2px] w-3/4 blur-sm mx-auto" />
+                <div className="absolute inset-x-20 top-0 bg-gradient-to-r from-transparent via-[#00eb78] to-transparent h-px w-3/4 mx-auto" />
+                <div className="absolute inset-x-60 top-0 bg-gradient-to-r from-transparent via-[#0052FF] to-transparent h-[5px] w-1/4 blur-sm mx-auto" />
+                <div className="absolute inset-x-60 top-0 bg-gradient-to-r from-transparent via-[#0052FF] to-transparent h-px w-1/4 mx-auto" />
+
+                {/* Radial Gradient to prevent sharp edges */}
+                <div className="absolute inset-0 w-full h-full bg-black [mask-image:radial-gradient(350px_200px_at_top,transparent_20%,white)]"></div>
+              </div>
 
               <p className="text-xl md:text-2xl text-gray-400 max-w-3xl mx-auto leading-relaxed">
                 Instant crypto tips on <span className="text-[#00eb78] font-semibold">Hedera</span> and <span className="text-[#0052FF] font-semibold">Base</span> networks.
@@ -460,11 +487,30 @@ export default function App() {
               )}
             </div>
           </div>
+
+          {/* Gradient Fade Overlay at bottom - smoother transition */}
+          <div className="absolute bottom-0 left-0 w-full h-60 bg-gradient-to-t from-black/90 via-transparent to-transparent z-10 pointer-events-none"></div>
         </section>
 
         {/* Features Section */}
-        <section className="py-20 px-6 bg-[#181818]/50 backdrop-blur-sm">
-          <div className="max-w-6xl mx-auto">
+        <section className="relative py-20 px-6 bg-black/95">
+          {/* Extended Sparkles with Fade Effect */}
+          <div className="absolute top-0 left-0 w-full h-[400px] pointer-events-none overflow-hidden">
+            <SparklesCore
+              id="tsparticlesfeatures"
+              background="transparent"
+              minSize={0.4}
+              maxSize={1}
+              particleDensity={20}
+              className="w-full h-full"
+              particleColor="#00eb78"
+              speed={0.3}
+            />
+            {/* Fade out gradient - more subtle */}
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/30 to-black/95"></div>
+          </div>
+
+          <div className="max-w-6xl mx-auto relative z-10">
             <div className="text-center mb-16">
               <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">Why Ez Crypto Tips?</h2>
               <p className="text-gray-400 text-lg max-w-2xl mx-auto">
@@ -547,7 +593,7 @@ export default function App() {
         </section>
 
         {/* Stats Section */}
-        <section className="py-20 px-6 bg-gradient-to-r from-[#00eb78]/5 to-[#0052FF]/5">
+        <section className="py-20 px-6 bg-gradient-to-br from-black via-[#00eb78]/5 to-[#0052FF]/5">
           <div className="max-w-6xl mx-auto">
             <div className="grid md:grid-cols-2 gap-12 items-center">
               <div>
