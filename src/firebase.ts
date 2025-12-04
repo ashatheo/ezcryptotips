@@ -1,5 +1,5 @@
 import { initializeApp, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
+import { getAuth, Auth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 
 // Firebase configuration from environment variables
@@ -16,6 +16,7 @@ const firebaseConfig = {
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
+let googleProvider: GoogleAuthProvider | null = null;
 
 // Check if all required config values are present
 const hasValidConfig = firebaseConfig.apiKey &&
@@ -27,6 +28,13 @@ if (hasValidConfig) {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     db = getFirestore(app);
+
+    // Initialize Google Auth Provider
+    googleProvider = new GoogleAuthProvider();
+    googleProvider.setCustomParameters({
+      prompt: 'select_account'
+    });
+
     console.log('✅ Firebase initialized successfully');
   } catch (e) {
     console.error('❌ Firebase initialization failed:', e);
@@ -36,4 +44,4 @@ if (hasValidConfig) {
   console.warn('Required variables: VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID');
 }
 
-export { app, auth, db };
+export { app, auth, db, googleProvider };

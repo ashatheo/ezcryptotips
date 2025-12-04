@@ -8,7 +8,9 @@ import {
   sendEmailVerification,
   sendPasswordResetEmail,
   updateProfile,
-  UserCredential
+  UserCredential,
+  signInWithPopup,
+  GoogleAuthProvider
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp, Firestore } from 'firebase/firestore';
 import { Auth } from 'firebase/auth';
@@ -34,6 +36,7 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   register: (
     email: string,
     password: string,
@@ -44,6 +47,12 @@ interface AuthContextType {
       baseAddress?: string;
     }
   ) => Promise<UserCredential>;
+  registerWithGoogle: (profileData: {
+    name: string;
+    restaurant: string;
+    hederaId: string;
+    baseAddress?: string;
+  }) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUserProfile: (updates: Partial<WaiterProfile>) => Promise<void>;
@@ -64,9 +73,10 @@ interface AuthProviderProps {
   children: React.ReactNode;
   firebaseAuth: Auth | null;
   firebaseDb: Firestore | null;
+  googleProvider: GoogleAuthProvider | null;
 }
 
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children, firebaseAuth, firebaseDb }) => {
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children, firebaseAuth, firebaseDb, googleProvider }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<WaiterProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -135,6 +145,37 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, firebaseAu
     } catch (err: any) {
       console.error('Login error:', err);
       setError(err.message || 'Failed to login');
+      throw err;
+    }
+  };
+
+  // Login with Google
+  const loginWithGoogle = async () => {
+    try {
+      setError(null);
+
+      if (!firebaseAuth || !googleProvider) {
+        throw new Error('Firebase Auth or Google Provider not initialized');
+      }
+
+      const result = await signInWithPopup(firebaseAuth, googleProvider);
+      const { uid } = result.user;
+
+      // Check if profile exists
+      if (firebaseDb) {
+        const profileRef = doc(firebaseDb, 'waiters', uid);
+        const profileSnap = await getDoc(profileRef);
+
+        if (!profileSnap.exists()) {
+          // New user - profile doesn't exist yet
+          // Sign out and throw error to redirect to registration
+          await signOut(firebaseAuth);
+          throw new Error('PROFILE_NOT_FOUND');
+        }
+      }
+    } catch (err: any) {
+      console.error('Google login error:', err);
+      setError(err.message || 'Failed to login with Google');
       throw err;
     }
   };
@@ -208,6 +249,70 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, firebaseAu
     }
   };
 
+  // Register with Google
+  const registerWithGoogle = async (profileData: {
+    name: string;
+    restaurant: string;
+    hederaId: string;
+    baseAddress?: string;
+  }) => {
+    try {
+      setError(null);
+
+      if (!firebaseAuth || !googleProvider || !firebaseDb) {
+        throw new Error('Firebase not initialized');
+      }
+
+      // Sign in with Google
+      const result = await signInWithPopup(firebaseAuth, googleProvider);
+      const { uid, email, displayName, photoURL } = result.user;
+
+      if (!email) {
+        throw new Error('No email found in Google account');
+      }
+
+      // Check if profile already exists
+      const profileRef = doc(firebaseDb, 'waiters', uid);
+      const profileSnap = await getDoc(profileRef);
+
+      if (profileSnap.exists()) {
+        // Profile already exists - just load it
+        await loadProfile(uid);
+        return;
+      }
+
+      // Create QR code URL
+      const qrCodeUrl = `${window.location.origin}${window.location.pathname}?waiter=${uid}`;
+
+      // Create Firestore profile
+      const waiterProfile: Partial<WaiterProfile> = {
+        uid,
+        email,
+        name: profileData.name || displayName || 'Unknown',
+        restaurant: profileData.restaurant,
+        hederaId: profileData.hederaId,
+        baseAddress: profileData.baseAddress || '',
+        bio: '',
+        photoURL: photoURL || '',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        isActive: true,
+        qrCodeUrl
+      };
+
+      await setDoc(doc(firebaseDb, 'waiters', uid), waiterProfile);
+
+      // Load the profile
+      await loadProfile(uid);
+
+      console.log('Google registration successful');
+    } catch (err: any) {
+      console.error('Google registration error:', err);
+      setError(err.message || 'Failed to register with Google');
+      throw err;
+    }
+  };
+
   // Logout
   const logout = async () => {
     try {
@@ -270,7 +375,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, firebaseAu
     loading,
     error,
     login,
+    loginWithGoogle,
     register,
+    registerWithGoogle,
     logout,
     resetPassword,
     updateUserProfile,
