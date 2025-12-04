@@ -73,9 +73,8 @@ The application will be available at `http://localhost:5173`
 │   ├── HederaWalletContext.tsx  # Hedera wallet integration
 │   ├── firebase.ts      # Firebase configuration
 │   └── main.tsx         # Application entry point
-├── contracts/
-│   └── HederaTipSplitter.sol  # Smart contract (5% fee split)
-└── grant/               # Grant application materials
+└── contracts/
+    └── HederaTipSplitter.sol  # Smart contract (5% fee split)
 ```
 
 
