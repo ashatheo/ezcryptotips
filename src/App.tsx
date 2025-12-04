@@ -20,7 +20,7 @@ import {
 } from 'firebase/firestore';
 import { useHederaWallet, type ReviewData } from './HederaWalletContext';
 import { useAuth } from './contexts/AuthContext';
-import { db } from './firebase';
+import { db, auth, googleProvider } from './firebase';
 import { StarRating } from './components/StarRating';
 import { useWaiterRating } from './hooks/useWaiterRating';
 import { SparklesCore } from './components/ui/sparkles';
@@ -86,7 +86,7 @@ export default function App() {
   } = useHederaWallet();
 
   // State
-  const [view, setView] = useState<'landing' | 'register' | 'login' | 'dashboard' | 'qr' | 'pay' | 'success' | 'edit-profile'>('landing');
+  const [view, setView] = useState<'landing' | 'register' | 'login' | 'dashboard' | 'qr' | 'pay' | 'success' | 'edit-profile' | 'google-profile'>('landing');
   const [waiterData, setWaiterData] = useState<WaiterProfile | null>(null);
   const [amount, setAmount] = useState<string>('');
   const [review, setReview] = useState<string>('');
@@ -95,6 +95,7 @@ export default function App() {
   const [selectedToken, setSelectedToken] = useState<TokenOption>(AVAILABLE_TOKENS[0]);
   const [transactionId, setTransactionId] = useState<string>('');
   const [coverFee, setCoverFee] = useState<boolean>(false);
+  const [googleUserData, setGoogleUserData] = useState<{uid: string; email: string; displayName: string | null; photoURL: string | null} | null>(null);
 
   // Rating hooks - called at top level to comply with React Hooks rules
   const { averageRating: dashboardRating, totalReviews: dashboardTotalReviews, totalRatings: dashboardTotalRatings, isLoading: dashboardRatingLoading } = useWaiterRating(user?.uid);
@@ -323,8 +324,61 @@ export default function App() {
     }
   };
 
-  // Google Register handler
+  // Google Register handler - Step 1: Sign in with Google
   const handleGoogleRegister = async () => {
+    setLoading(true);
+
+    try {
+      if (!auth || !googleProvider) {
+        throw new Error('Firebase Auth or Google Provider not initialized');
+      }
+
+      // Import needed functions
+      const { signInWithPopup } = await import('firebase/auth');
+
+      // Sign in with Google first
+      const result = await signInWithPopup(auth, googleProvider);
+      const { uid, email, displayName, photoURL } = result.user;
+
+      if (!email) {
+        throw new Error('No email found in Google account');
+      }
+
+      // Check if profile already exists
+      if (db) {
+        const { doc, getDoc } = await import('firebase/firestore');
+        const profileRef = doc(db, 'waiters', uid);
+        const profileSnap = await getDoc(profileRef);
+
+        if (profileSnap.exists()) {
+          // Profile already exists - redirect to dashboard
+          alert('Account already exists! Redirecting to dashboard...');
+          setView('dashboard');
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Store Google user data temporarily
+      setGoogleUserData({ uid, email, displayName, photoURL });
+
+      // Show profile completion form
+      setView('google-profile');
+    } catch (error: any) {
+      console.error("Google sign-in error: ", error);
+      if (error.code === 'auth/popup-closed-by-user') {
+        alert('Sign-in cancelled.');
+      } else {
+        alert(error.message || "Google sign-in error. Check console.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Complete Google registration with profile data
+  const handleCompleteGoogleRegistration = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
 
     try {
@@ -341,7 +395,11 @@ export default function App() {
         return;
       }
 
-      // Register with Google
+      if (!googleUserData) {
+        throw new Error('No Google user data found');
+      }
+
+      // Register with Google using stored data
       await registerWithGoogle({
         name: regForm.name,
         restaurant: regForm.restaurant,
@@ -350,6 +408,7 @@ export default function App() {
       });
 
       alert('Registration successful!');
+      setGoogleUserData(null);
 
       // Let the AUTO-LOGIN effect handle redirect to dashboard
     } catch (error: any) {
@@ -917,10 +976,41 @@ export default function App() {
               <ArrowLeft size={24} />
             </button>
             <h2 className="text-3xl font-bold text-white mb-1">Registration</h2>
-            <p className="text-gray-400">Set up your wallet addresses</p>
+            <p className="text-gray-400">Quick setup with Google or Email</p>
           </div>
-          
-          <form onSubmit={handleRegister} className="p-8 space-y-4">
+
+          <div className="p-8">
+            {/* Google Sign Up Button - Top Priority */}
+            <button
+              type="button"
+              onClick={handleGoogleRegister}
+              disabled={loading}
+              className="w-full bg-white hover:bg-gray-100 text-gray-900 font-semibold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-3 border-2 border-gray-300 hover:border-[#00eb78] disabled:opacity-50 disabled:hover:border-gray-300 shadow-lg"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              {loading ? 'Connecting...' : 'Continue with Google'}
+            </button>
+            <p className="text-xs text-gray-500 text-center mt-2 mb-6">
+              Fastest way to get started - complete your profile after sign in
+            </p>
+
+            {/* Divider */}
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-800"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-[#181818] px-2 text-gray-500">Or register with email</span>
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleRegister} className="px-8 pb-8 space-y-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Email</label>
               <input
@@ -1022,36 +1112,7 @@ export default function App() {
               {loading ? 'Creating Account...' : 'Create Account'}
             </button>
 
-            {/* Divider */}
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-800"></div>
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-[#181818] px-2 text-gray-500">Or</span>
-              </div>
-            </div>
-
-            {/* Google Sign Up Button */}
-            <button
-              type="button"
-              onClick={handleGoogleRegister}
-              disabled={loading}
-              className="w-full bg-white hover:bg-gray-100 text-gray-900 font-semibold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-3 border border-gray-300 disabled:opacity-50"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-              </svg>
-              Continue with Google
-            </button>
-            <p className="text-xs text-gray-500 text-center mt-2">
-              Make sure to fill in your profile info before using Google Sign Up
-            </p>
-
-            <div className="text-center pt-4">
+            <div className="text-center pt-6">
               <p className="text-gray-500 text-sm">
                 Already have an account?{' '}
                 <button
@@ -1063,6 +1124,122 @@ export default function App() {
                 </button>
               </p>
             </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === 'google-profile') {
+    if (!googleUserData) {
+      setView('register');
+      return null;
+    }
+
+    return (
+      <div className="min-h-screen bg-black flex flex-col p-6 font-sans">
+        <div className="max-w-md w-full mx-auto bg-[#181818] rounded-3xl border border-gray-800 overflow-hidden shadow-2xl">
+          <div className="p-8 border-b border-gray-800">
+            <button onClick={() => {
+              setView('register');
+              setGoogleUserData(null);
+            }} className="text-gray-400 hover:text-white mb-6 transition-colors">
+              <ArrowLeft size={24} />
+            </button>
+            <h2 className="text-3xl font-bold text-white mb-1">Complete Your Profile</h2>
+            <p className="text-gray-400">Just a few more details to get started</p>
+          </div>
+
+          {/* Google Account Info */}
+          <div className="p-8 border-b border-gray-800 bg-black/30">
+            <div className="flex items-center gap-4">
+              {googleUserData.photoURL ? (
+                <img src={googleUserData.photoURL} alt="Profile" className="w-16 h-16 rounded-full border-2 border-[#00eb78]" />
+              ) : (
+                <div className="w-16 h-16 bg-[#00eb78] rounded-full flex items-center justify-center text-2xl font-bold text-black">
+                  {googleUserData.displayName?.charAt(0) || 'U'}
+                </div>
+              )}
+              <div className="flex-1">
+                <p className="text-white font-semibold">{googleUserData.displayName || 'User'}</p>
+                <p className="text-gray-400 text-sm">{googleUserData.email}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                  <span className="text-xs text-gray-500">Connected with Google</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleCompleteGoogleRegistration} className="p-8 space-y-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Your Name *</label>
+              <input
+                required
+                type="text"
+                className="w-full bg-black text-white p-4 border border-gray-700 rounded-xl focus:border-[#00eb78] outline-none transition-all placeholder-gray-600"
+                placeholder="Alex"
+                value={regForm.name}
+                onChange={e => setRegForm({...regForm, name: e.target.value})}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Restaurant / Venue *</label>
+              <input
+                required
+                type="text"
+                className="w-full bg-black text-white p-4 border border-gray-700 rounded-xl focus:border-[#00eb78] outline-none transition-all placeholder-gray-600"
+                placeholder="Burger Heroes"
+                value={regForm.restaurant}
+                onChange={e => setRegForm({...regForm, restaurant: e.target.value})}
+              />
+            </div>
+
+            <div className="pt-4 border-t border-gray-800">
+              <p className="text-gray-400 text-sm mb-4">Add at least one wallet address *</p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#00eb78] mb-1">Hedera Account ID</label>
+                  <input
+                    type="text"
+                    className="w-full bg-black text-white p-3 border border-gray-700 rounded-xl focus:border-[#00eb78] outline-none font-mono text-sm"
+                    placeholder="0.0.xxxxx"
+                    value={regForm.hederaId}
+                    onChange={e => setRegForm({...regForm, hederaId: e.target.value})}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#0052FF] mb-1">Base Address (EVM)</label>
+                  <input
+                    type="text"
+                    className="w-full bg-black text-white p-3 border border-gray-700 rounded-xl focus:border-[#0052FF] outline-none font-mono text-sm"
+                    placeholder="0x..."
+                    value={regForm.baseAddress}
+                    onChange={e => setRegForm({...regForm, baseAddress: e.target.value})}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full mt-6 bg-[#00eb78] hover:bg-[#00c96d] text-black font-bold py-4 px-6 rounded-xl transition-all shadow-[0_0_15px_rgba(0,235,120,0.2)] disabled:opacity-50"
+            >
+              {loading ? 'Creating Profile...' : 'Complete Registration'}
+            </button>
+
+            <p className="text-xs text-gray-400 text-center mt-4">
+              Your QR code will be generated after completing registration
+            </p>
           </form>
         </div>
       </div>
