@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EZ Crypto Tips - Download Logo</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 40px;
+            background: #000;
+            font-family: system-ui, -apple-system, sans-serif;
+            color: white;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        h1 {
+            color: #00eb78;
+            margin-bottom: 30px;
+        }
+        .logo-preview {
+            background: #181818;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 30px;
+            padding: 40px;
+            margin: 20px auto;
+            width: fit-content;
+            box-shadow: 0 0 40px rgba(0, 235, 120, 0.2);
+        }
+        .qr-icon {
+            width: 128px;
+            height: 128px;
+        }
+        .download-section {
+            margin-top: 40px;
+        }
+        button {
+            background: #00eb78;
+            color: black;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #00c96d;
+            transform: scale(1.05);
+        }
+        canvas {
+            display: none;
+        }
+        .info {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>EZ Crypto Tips Logo</h1>
+
+        <div class="logo-preview">
+            <svg class="qr-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="3" width="7" height="7" stroke="#00eb78" stroke-width="2" fill="none"/>
+                <rect x="14" y="3" width="7" height="7" stroke="#00eb78" stroke-width="2" fill="none"/>
+                <rect x="3" y="14" width="7" height="7" stroke="#00eb78" stroke-width="2" fill="none"/>
+                <rect x="5" y="5" width="3" height="3" fill="#00eb78"/>
+                <rect x="16" y="5" width="3" height="3" fill="#00eb78"/>
+                <rect x="5" y="16" width="3" height="3" fill="#00eb78"/>
+                <rect x="14" y="14" width="2" height="2" fill="#00eb78"/>
+                <rect x="17" y="14" width="2" height="2" fill="#00eb78"/>
+                <rect x="20" y="14" width="1" height="7" fill="#00eb78"/>
+                <rect x="14" y="17" width="2" height="2" fill="#00eb78"/>
+                <rect x="14" y="20" width="5" height="1" fill="#00eb78"/>
+            </svg>
+        </div>
+
+        <div class="download-section">
+            <h2>Download Options</h2>
+            <button onclick="downloadSVG()">Download SVG</button>
+            <button onclick="downloadPNG(512)">Download PNG (512x512)</button>
+            <button onclick="downloadPNG(1024)">Download PNG (1024x1024)</button>
+        </div>
+
+        <div class="info">
+            <h3>Logo Files Available:</h3>
+            <ul style="list-style: none; padding: 0;">
+                <li>📁 <code>public/logo.svg</code> - Vector format (scalable)</li>
+                <li>🎨 Color: Hedera Green (#00eb78)</li>
+                <li>📐 Format: Square with rounded corners</li>
+            </ul>
+        </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        function downloadSVG() {
+            const svgContent = `<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="10" y="10" width="180" height="180" rx="30" fill="rgba(255, 255, 255, 0.05)" stroke="rgba(255, 255, 255, 0.2)" stroke-width="2"/>
+  <g transform="translate(100, 100) scale(3.5)">
+    <rect x="-8" y="-8" width="5" height="5" stroke="#00eb78" stroke-width="1.5" fill="none"/>
+    <rect x="3" y="-8" width="5" height="5" stroke="#00eb78" stroke-width="1.5" fill="none"/>
+    <rect x="-8" y="3" width="5" height="5" stroke="#00eb78" stroke-width="1.5" fill="none"/>
+    <rect x="-6.5" y="-6.5" width="2" height="2" fill="#00eb78"/>
+    <rect x="4.5" y="-6.5" width="2" height="2" fill="#00eb78"/>
+    <rect x="-6.5" y="4.5" width="2" height="2" fill="#00eb78"/>
+    <rect x="3" y="3" width="1.5" height="1.5" fill="#00eb78"/>
+    <rect x="5.5" y="3" width="1.5" height="1.5" fill="#00eb78"/>
+    <rect x="7" y="3" width="0.8" height="5" fill="#00eb78"/>
+    <rect x="3" y="5.5" width="1.5" height="1.5" fill="#00eb78"/>
+    <rect x="3" y="7" width="4" height="0.8" fill="#00eb78"/>
+  </g>
+</svg>`;
+
+            const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ezcryptotips-logo.svg';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function downloadPNG(size) {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = size;
+            canvas.height = size;
+
+            // Background
+            ctx.fillStyle = '#181818';
+            ctx.fillRect(0, 0, size, size);
+
+            // Rounded rectangle for border
+            const padding = size * 0.05;
+            const width = size - padding * 2;
+            const radius = size * 0.15;
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.lineWidth = size * 0.01;
+            ctx.beginPath();
+            ctx.roundRect(padding, padding, width, width, radius);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.fill();
+            ctx.stroke();
+
+            // QR Code pattern
+            const center = size / 2;
+            const scale = size / 200 * 3.5;
+            const blockSize = 5 * scale;
+            const smallBlock = 1.5 * scale;
+            const innerBlock = 2 * scale;
+
+            ctx.fillStyle = '#00eb78';
+            ctx.strokeStyle = '#00eb78';
+            ctx.lineWidth = 1.5 * scale;
+
+            // Helper function to draw square
+            function drawSquare(x, y, w, h, fill = false) {
+                const px = center + x * scale;
+                const py = center + y * scale;
+                if (fill) {
+                    ctx.fillRect(px, py, w * scale, h * scale);
+                } else {
+                    ctx.strokeRect(px, py, w * scale, h * scale);
+                }
+            }
+
+            // Corner squares (outlined)
+            drawSquare(-8, -8, 5, 5);
+            drawSquare(3, -8, 5, 5);
+            drawSquare(-8, 3, 5, 5);
+
+            // Inner corner squares (filled)
+            drawSquare(-6.5, -6.5, 2, 2, true);
+            drawSquare(4.5, -6.5, 2, 2, true);
+            drawSquare(-6.5, 4.5, 2, 2, true);
+
+            // Pattern blocks
+            drawSquare(3, 3, 1.5, 1.5, true);
+            drawSquare(5.5, 3, 1.5, 1.5, true);
+            drawSquare(7, 3, 0.8, 5, true);
+            drawSquare(3, 5.5, 1.5, 1.5, true);
+            drawSquare(3, 7, 4, 0.8, true);
+
+            // Download
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `ezcryptotips-logo-${size}x${size}.png`;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background rounded square with border -->
+  <rect x="10" y="10" width="180" height="180" rx="30" fill="rgba(255, 255, 255, 0.05)" stroke="rgba(255, 255, 255, 0.2)" stroke-width="2"/>
+
+  <!-- QR Code Icon in Hedera Green -->
+  <g transform="translate(100, 100)">
+    <!-- Center icon scaled and colored -->
+    <rect x="-40" y="-40" width="20" height="20" fill="#00eb78"/>
+    <rect x="-40" y="-15" width="20" height="20" fill="#00eb78"/>
+    <rect x="-40" y="10" width="20" height="20" fill="#00eb78"/>
+
+    <rect x="-15" y="-40" width="20" height="20" fill="#00eb78"/>
+    <rect x="-15" y="10" width="20" height="20" fill="#00eb78"/>
+
+    <rect x="10" y="-40" width="20" height="20" fill="#00eb78"/>
+    <rect x="10" y="-15" width="20" height="20" fill="#00eb78"/>
+    <rect x="10" y="10" width="20" height="20" fill="#00eb78"/>
+
+    <!-- Corner markers -->
+    <rect x="-45" y="-45" width="30" height="30" stroke="#00eb78" stroke-width="3" fill="none"/>
+    <rect x="15" y="-45" width="30" height="30" stroke="#00eb78" stroke-width="3" fill="none"/>
+    <rect x="-45" y="15" width="30" height="30" stroke="#00eb78" stroke-width="3" fill="none"/>
+  </g>
+</svg>

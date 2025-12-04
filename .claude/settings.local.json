@@ -15,7 +15,8 @@
       "Bash(firebase deploy:*)",
       "Bash(cat:*)",
       "Bash(test:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(git stash:*)"
     ],
     "deny": [],
     "ask": []

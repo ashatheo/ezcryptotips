@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   QrCode,
   Wallet,
@@ -24,6 +24,8 @@ import { db } from './firebase';
 import { StarRating } from './components/StarRating';
 import { useWaiterRating } from './hooks/useWaiterRating';
 import { SparklesCore } from './components/ui/sparkles';
+import { Confetti, type ConfettiRef } from './components/ui/confetti';
+import confetti from 'canvas-confetti';
 
 // --- CONSTANTS ---
 const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'ez-crypto-tips';
@@ -92,10 +94,47 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [selectedToken, setSelectedToken] = useState<TokenOption>(AVAILABLE_TOKENS[0]);
   const [transactionId, setTransactionId] = useState<string>('');
+  const [coverFee, setCoverFee] = useState<boolean>(false);
 
   // Rating hooks - called at top level to comply with React Hooks rules
   const { averageRating: dashboardRating, totalReviews: dashboardTotalReviews, totalRatings: dashboardTotalRatings, isLoading: dashboardRatingLoading } = useWaiterRating(user?.uid);
   const { averageRating: paymentRating, totalRatings: paymentTotalRatings, isLoading: paymentRatingLoading } = useWaiterRating(waiterData?.id);
+
+  // Confetti effect for success view
+  useEffect(() => {
+    if (view === 'success') {
+      const duration = 3 * 1000;
+      const animationEnd = Date.now() + duration;
+      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 1000 };
+
+      const randomInRange = (min: number, max: number) =>
+        Math.random() * (max - min) + min;
+
+      const interval = window.setInterval(() => {
+        const timeLeft = animationEnd - Date.now();
+
+        if (timeLeft <= 0) {
+          return clearInterval(interval);
+        }
+
+        const particleCount = 50 * (timeLeft / duration);
+        confetti({
+          ...defaults,
+          particleCount,
+          origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+          colors: ['#00eb78', '#0052FF', '#FFD700', '#FF69B4', '#00FFFF'],
+        });
+        confetti({
+          ...defaults,
+          particleCount,
+          origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+          colors: ['#00eb78', '#0052FF', '#FFD700', '#FF69B4', '#00FFFF'],
+        });
+      }, 250);
+
+      return () => clearInterval(interval);
+    }
+  }, [view]);
 
   // --- AUTO-LOGIN TO DASHBOARD ---
   useEffect(() => {
@@ -189,6 +228,7 @@ export default function App() {
     setReview('');
     setRating(0);
     setSelectedToken(AVAILABLE_TOKENS[0]); // Reset to default
+    setCoverFee(false); // Reset cover fee checkbox
     setView('pay');
   };
 
@@ -316,10 +356,17 @@ export default function App() {
 
   const processPayment = async (address: string) => {
     const networkName = selectedToken.network;
+    const tipAmount = parseFloat(amount);
+    const totalAmount = coverFee ? tipAmount * 1.05 : tipAmount;
+    const waiterReceives = coverFee ? tipAmount : tipAmount * 0.95;
+
     console.log(`--- STARTING ${networkName.toUpperCase()} PAYMENT ---`);
     console.log(`Token: ${selectedToken.symbol}`);
     console.log(`Recipient: ${address}`);
-    console.log(`Amount: ${amount}`);
+    console.log(`Tip Amount: ${amount}`);
+    console.log(`Cover Fee: ${coverFee ? 'Yes' : 'No'}`);
+    console.log(`Total to Send: ${totalAmount}`);
+    console.log(`Waiter Receives: ${waiterReceives}`);
 
     if (selectedToken.id === 'hbar') {
       // Real Hedera transaction
@@ -328,9 +375,9 @@ export default function App() {
       }
 
       console.log('[HEDERA REAL TRANSACTION]');
-      console.log(`Transferring ${amount} HBAR from ${hederaAccountId} to ${address}`);
+      console.log(`Transferring ${totalAmount} HBAR from ${hederaAccountId} to ${address}`);
 
-      const txId = await sendHbarTransfer(address, parseFloat(amount));
+      const txId = await sendHbarTransfer(address, totalAmount);
       setTransactionId(txId);
 
       console.log(`Transaction successful! ID: ${txId}`);
@@ -346,7 +393,7 @@ export default function App() {
             restaurant: waiterData?.restaurant || 'Unknown',
             rating: rating > 0 ? rating : undefined,
             comment: review.trim(),
-            tipAmount: parseFloat(amount),
+            tipAmount: waiterReceives,
             timestamp: Date.now(),
           };
 
@@ -362,7 +409,9 @@ export default function App() {
                 restaurant: waiterData.restaurant,
                 rating: rating > 0 ? rating : null,
                 comment: review.trim(),
-                tipAmount: parseFloat(amount),
+                tipAmount: waiterReceives,
+                totalAmount: totalAmount,
+                coverFee: coverFee,
                 transactionId: reviewTxId,
                 timestamp: serverTimestamp(),
                 network: 'Hedera',
@@ -1453,6 +1502,43 @@ export default function App() {
                </div>
             </div>
 
+            {/* Cover Platform Fee Checkbox */}
+            {amount && parseFloat(amount) > 0 && (
+              <div className="mb-8 p-4 bg-black/60 border border-gray-800 rounded-xl">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={coverFee}
+                    onChange={(e) => setCoverFee(e.target.checked)}
+                    className="mt-1 w-5 h-5 rounded bg-black border-gray-700 text-[#00eb78] focus:ring-[#00eb78] focus:ring-2 cursor-pointer"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-white font-semibold text-sm">Cover 5% platform fee</span>
+                      {coverFee && (
+                        <span className="text-xs bg-[#00eb78] text-black px-2 py-0.5 rounded-full font-bold">
+                          +{(parseFloat(amount) * 0.05).toFixed(2)} {selectedToken.symbol}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 leading-relaxed">
+                      {coverFee ? (
+                        <>
+                          Total: <span className="text-white font-bold">{(parseFloat(amount) * 1.05).toFixed(2)} {selectedToken.symbol}</span>
+                          {' '}(Waiter receives full {amount} {selectedToken.symbol})
+                        </>
+                      ) : (
+                        <>
+                          Waiter receives: <span className="text-gray-300">{(parseFloat(amount) * 0.95).toFixed(2)} {selectedToken.symbol}</span>
+                          {' '}after 5% platform fee
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </label>
+              </div>
+            )}
+
             {/* Rating Section */}
             <div className="mb-6">
                <div className="flex items-center justify-between mb-3">
@@ -1572,13 +1658,17 @@ export default function App() {
   }
 
   if (view === 'success') {
+    const tipAmount = parseFloat(amount);
+    const totalPaid = coverFee ? tipAmount * 1.05 : tipAmount;
+    const waiterReceived = coverFee ? tipAmount : tipAmount * 0.95;
+
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 text-center font-sans">
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 text-center font-sans relative">
         <div className="bg-[#181818] p-8 rounded-full border border-gray-800 mb-8 relative">
           <div className="absolute inset-0 bg-[#00eb78] blur-3xl opacity-20 rounded-full"></div>
           <Coins size={64} color={selectedToken.color} className="relative z-10" />
         </div>
-        
+
         <h2 className="text-4xl font-bold text-white mb-2">Success!</h2>
         <p className="text-gray-400 max-w-xs mx-auto mb-10 text-lg">
           Your tip was sent to <span className="text-white font-medium">{waiterData?.name}</span> via {selectedToken.network}.
@@ -1586,11 +1676,30 @@ export default function App() {
 
         <div className="bg-[#181818] p-6 rounded-2xl border border-gray-800 w-full max-w-sm text-left mb-8 space-y-4">
            <div className="flex justify-between items-center pb-4 border-b border-gray-800">
-             <span className="text-gray-500 text-sm">Total Amount</span>
-             <span className="font-bold text-2xl text-white">{amount} <span className="text-sm text-gray-500 font-normal">{selectedToken.symbol}</span></span>
+             <span className="text-gray-500 text-sm">You Paid</span>
+             <span className="font-bold text-2xl text-white">{totalPaid.toFixed(2)} <span className="text-sm text-gray-500 font-normal">{selectedToken.symbol}</span></span>
            </div>
 
            <div className="flex justify-between items-center">
+             <span className="text-gray-500 text-sm">Waiter Received</span>
+             <span className="text-white font-bold">{waiterReceived.toFixed(2)} {selectedToken.symbol}</span>
+           </div>
+
+           {coverFee && (
+             <div className="flex justify-between items-center">
+               <span className="text-gray-500 text-sm">Platform Fee (Covered)</span>
+               <span className="text-[#00eb78] font-semibold text-sm">+{(tipAmount * 0.05).toFixed(2)} {selectedToken.symbol}</span>
+             </div>
+           )}
+
+           {!coverFee && (
+             <div className="flex justify-between items-center">
+               <span className="text-gray-500 text-sm">Platform Fee (5%)</span>
+               <span className="text-gray-400 text-sm">{(tipAmount * 0.05).toFixed(2)} {selectedToken.symbol}</span>
+             </div>
+           )}
+
+           <div className="flex justify-between items-center pt-4 border-t border-gray-800">
              <span className="text-gray-500 text-sm">Network</span>
              <span className="font-mono text-xs text-black px-2 py-1 rounded" style={{backgroundColor: selectedToken.color}}>
                 {selectedToken.network}
