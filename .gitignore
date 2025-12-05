@@ -51,3 +51,6 @@ typechain-types
 
 # Deployment info (testnet only - mainnet should be private)
 deployment-mainnet.json
+
+# Grant application materials (confidential)
+grant/
