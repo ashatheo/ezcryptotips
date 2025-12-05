@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Waiters collection - public read for QR codes, write only for owner
+    match /waiters/{waiterId} {
+      // Anyone can read waiter profiles (needed for QR code scanning)
+      allow read: if true;
+
+      // Only the owner can write their profile
+      allow write: if request.auth != null && request.auth.uid == waiterId;
+    }
+
+    // Reviews collection - public write (for tips), read for owner
+    match /artifacts/{appId}/public/data/reviews/{reviewId} {
+      allow read: if true;
+      allow create: if true; // Anyone can leave a review
+    }
+
+    // Old artifacts path - for backwards compatibility
+    match /artifacts/{appId}/public/data/waiters/{waiterId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == waiterId;
+    }
+  }
+}
