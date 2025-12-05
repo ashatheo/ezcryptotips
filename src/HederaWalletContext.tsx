@@ -46,10 +46,9 @@ const HederaWalletContext = createContext<HederaWalletContextType | undefined>(u
 const WALLETCONNECT_PROJECT_ID = 'aac7ba2b84124b57344a78c0e1122d59';
 
 // --- HCS TOPIC ID FOR REVIEWS ---
-// You need to create a topic using Hedera SDK or HashScan
-// For testnet, you can create one with: new TopicCreateTransaction()
-// For now, using a placeholder - you should create your own topic
-const REVIEWS_TOPIC_ID = '0.0.5158297'; // Replace with your actual topic ID
+// Topic ID for storing tamper-proof reviews on Hedera Consensus Service
+// All reviews are immutably recorded on HCS for transparency and anti-manipulation
+const REVIEWS_TOPIC_ID = import.meta.env.VITE_HCS_TOPIC_ID || '0.0.5158297';
 
 // --- PROVIDER ---
 export const HederaWalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

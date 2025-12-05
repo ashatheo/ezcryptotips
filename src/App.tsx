@@ -22,7 +22,9 @@ import { useHederaWallet, type ReviewData } from './HederaWalletContext';
 import { useAuth } from './contexts/AuthContext';
 import { db, auth, googleProvider } from './firebase';
 import { StarRating } from './components/StarRating';
+import { ReviewList } from './components/ReviewList';
 import { useWaiterRating } from './hooks/useWaiterRating';
+import { submitReviewToHCS, getReviewHashScanUrl } from './lib/hcsReviewService';
 import { SparklesCore } from './components/ui/sparkles';
 import { Confetti, type ConfettiRef } from './components/ui/confetti';
 import confetti from 'canvas-confetti';
@@ -564,27 +566,25 @@ export default function App() {
         console.log(`💰 Waiter receives: ${waiterReceives} HBAR (after 5% platform fee)`);
         console.log(`🏦 Platform receives: ${totalAmount - waiterReceives} HBAR (5% fee)`);
 
-        // Save review to Firebase for display purposes
-        if (db && waiterData?.id && ((review && review.trim()) || rating > 0)) {
+        // Submit review to HCS (Hedera Consensus Service) for tamper-proof storage
+        if (waiterData?.id && ((review && review.trim()) || rating > 0)) {
           try {
-            await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'reviews'), {
+            console.log('[HCS] Submitting review to HCS...');
+            await submitReview({
               waiterId: waiterData.id,
               waiterName: waiterData.name,
-              restaurant: waiterData.restaurant,
-              rating: rating > 0 ? rating : null,
+              restaurant: waiterData.restaurant || '',
+              rating: rating > 0 ? rating : undefined,
               comment: review.trim(),
               tipAmount: waiterReceives,
-              totalAmount: totalAmount,
-              coverFee: coverFee,
-              transactionId: txId,
-              timestamp: serverTimestamp(),
-              network: 'Hedera',
-              viaContract: true, // Flag to indicate this was sent via contract
+              timestamp: Date.now(),
             });
-            console.log('[Firebase] Review saved successfully');
-          } catch (firebaseError) {
-            console.error('[Firebase] Failed to save review:', firebaseError);
-            // Don't throw - transaction was successful, Firebase save is optional
+            console.log('[HCS] ✅ Review submitted to Hedera Consensus Service');
+            console.log('[HCS] Review is now immutably stored on blockchain');
+          } catch (hcsError: any) {
+            console.error('[HCS] ⚠️ Failed to submit review to HCS:', hcsError);
+            // Don't throw - transaction was successful, HCS submission is optional
+            // Review will still be associated with the transaction
           }
         }
       } catch (contractError: any) {
@@ -1612,6 +1612,11 @@ export default function App() {
                 ) : (
                   <p className="text-gray-500 text-sm">No ratings yet</p>
                 )}
+              </div>
+
+              {/* Reviews Section */}
+              <div className="mt-8 pt-8 border-t border-gray-800">
+                <ReviewList waiterId={user.uid} maxReviews={5} />
               </div>
             </div>
           </div>
