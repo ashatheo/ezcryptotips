@@ -48,7 +48,6 @@
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.19",
     "dotenv": "^17.2.3",
-    "firebase-admin": "^13.6.0",
     "gh-pages": "^6.1.1",
     "hardhat": "^3.0.17",
     "postcss": "^8.4.38",

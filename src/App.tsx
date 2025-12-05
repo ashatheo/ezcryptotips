@@ -23,6 +23,7 @@ import { useAuth } from './contexts/AuthContext';
 import { db, auth, googleProvider } from './firebase';
 import { StarRating } from './components/StarRating';
 import { ReviewList } from './components/ReviewList';
+import { WaiterRatingCard } from './components/WaiterRatingCard';
 import { useWaiterRating } from './hooks/useWaiterRating';
 import { submitReviewToHCS, getReviewHashScanUrl } from './lib/hcsReviewService';
 import { SparklesCore } from './components/ui/sparkles';
@@ -1586,37 +1587,13 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Rating & Recent Reviews */}
               <div className="mt-8 pt-8 border-t border-gray-800">
-                <h3 className="text-lg font-bold text-white mb-4">Your Rating</h3>
-                {dashboardRatingLoading ? (
-                  <p className="text-gray-500 text-sm">Loading rating...</p>
-                ) : dashboardTotalRatings > 0 ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <StarRating
-                        rating={Math.round(dashboardRating)}
-                        onRatingChange={() => {}}
-                        size={24}
-                        color="#00eb78"
-                        readOnly
-                      />
-                      <div className="flex flex-col">
-                        <span className="text-white font-bold text-lg">{dashboardRating.toFixed(1)}</span>
-                        <span className="text-gray-500 text-xs">{dashboardTotalRatings} {dashboardTotalRatings === 1 ? 'rating' : 'ratings'}</span>
-                      </div>
-                    </div>
-                    <p className="text-gray-500 text-xs">
-                      Based on {dashboardTotalReviews} {dashboardTotalReviews === 1 ? 'review' : 'reviews'}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-gray-500 text-sm">No ratings yet</p>
-                )}
-              </div>
-
-              {/* Reviews Section */}
-              <div className="mt-8 pt-8 border-t border-gray-800">
-                <ReviewList waiterId={user.uid} maxReviews={5} />
+                <h3 className="text-lg font-bold text-white mb-4">Your Rating & Reviews</h3>
+                <WaiterRatingCard
+                  waiterId={user.uid}
+                  waiterName={profile.name}
+                />
               </div>
             </div>
           </div>
@@ -1784,23 +1761,18 @@ export default function App() {
              </div>
              <h2 className="text-2xl font-bold text-white mb-1">{waiterData?.name}</h2>
              <p className="text-gray-500 uppercase text-xs tracking-wider mb-3">{waiterData?.restaurant}</p>
-
-             {/* Waiter Rating Display */}
-             {!paymentRatingLoading && paymentTotalRatings > 0 && (
-               <div className="flex items-center justify-center gap-2 pt-3 border-t border-gray-800/50">
-                 <StarRating
-                   rating={Math.round(paymentRating)}
-                   onRatingChange={() => {}}
-                   size={18}
-                   color="#00eb78"
-                   readOnly
-                 />
-                 <span className="text-gray-400 text-sm">
-                   {paymentRating.toFixed(1)} ({paymentTotalRatings})
-                 </span>
-               </div>
-             )}
           </div>
+
+          {/* Rating & Recent Reviews Card */}
+          {waiterData?.id && (
+            <div className="mb-6">
+              <WaiterRatingCard
+                waiterId={waiterData.id}
+                waiterName={waiterData.name}
+                compact={true}
+              />
+            </div>
+          )}
 
           {/* Payment Form */}
           <div className="bg-[#181818] border border-gray-800 rounded-3xl p-8">
