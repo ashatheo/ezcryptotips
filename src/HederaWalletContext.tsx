@@ -12,7 +12,10 @@ import {
   Hbar,
   TopicMessageSubmitTransaction,
   TopicId,
+  ContractExecuteTransaction,
+  ContractFunctionParameters,
 } from '@hashgraph/sdk';
+import { encodeSendTipData, getContractAddress, hbarToTinybar } from './lib/contractUtils';
 
 // --- TYPES ---
 export interface ReviewData {
@@ -32,6 +35,7 @@ interface HederaWalletContextType {
   connectWallet: () => Promise<void>;
   disconnectWallet: () => void;
   sendHbarTransfer: (toAccountId: string, amount: number) => Promise<string>;
+  sendTipViaContract: (waiterAddress: string, tipAmount: number, reviewText: string) => Promise<string>;
   submitReview: (reviewData: ReviewData) => Promise<string>;
   error: string | null;
 }
@@ -209,6 +213,73 @@ export const HederaWalletProvider: React.FC<{ children: React.ReactNode }> = ({ 
     [dAppConnector, accountId]
   );
 
+  // Send tip via smart contract
+  const sendTipViaContract = useCallback(
+    async (waiterAddress: string, tipAmount: number, reviewText: string = ''): Promise<string> => {
+      if (!dAppConnector || !accountId) {
+        throw new Error('Wallet not connected');
+      }
+
+      try {
+        setError(null);
+
+        console.log('[CONTRACT] Sending tip via HederaTipSplitter');
+        console.log('[CONTRACT] Contract address:', getContractAddress());
+        console.log('[CONTRACT] Waiter address:', waiterAddress);
+        console.log('[CONTRACT] Tip amount:', tipAmount, 'HBAR');
+        console.log('[CONTRACT] Review text:', reviewText || '(empty)');
+
+        // Encode the contract function call
+        const functionParameters = new ContractFunctionParameters()
+          .addAddress(waiterAddress)
+          .addString(reviewText || '');
+
+        // Create contract execute transaction
+        const transaction = new ContractExecuteTransaction()
+          .setContractId(getContractAddress())
+          .setGas(300000) // Gas limit for contract execution
+          .setPayableAmount(new Hbar(tipAmount)) // Send HBAR with the transaction
+          .setFunction('sendTip', functionParameters);
+
+        console.log('[CONTRACT] Transaction created, freezing...');
+
+        // Freeze transaction
+        const frozenTransaction = await transaction.freezeWithSigner(
+          dAppConnector.getSigner(AccountId.fromString(accountId))
+        );
+
+        // Convert transaction to bytes
+        const transactionBytes = frozenTransaction.toBytes();
+        const transactionBase64 = Buffer.from(transactionBytes).toString('base64');
+
+        console.log('[CONTRACT] Transaction frozen, signing and executing...');
+
+        // Sign and execute transaction
+        const result = await dAppConnector.signAndExecuteTransaction({
+          signerAccountId: `hedera:testnet:${accountId}`,
+          transactionList: transactionBase64,
+        });
+
+        console.log('[CONTRACT] Transaction result:', result);
+
+        // Extract transaction ID from result
+        if (result && result.response) {
+          const txId = result.response.transactionId || 'Transaction submitted';
+          console.log('[CONTRACT] ✅ Tip sent successfully! Transaction ID:', txId);
+          console.log('[CONTRACT] 💰 Amount:', tipAmount, 'HBAR (5% fee auto-split by contract)');
+          return txId;
+        }
+
+        return 'Transaction submitted successfully';
+      } catch (err: any) {
+        console.error('[CONTRACT] Failed to send tip:', err);
+        setError(err.message || 'Failed to send tip via contract');
+        throw err;
+      }
+    },
+    [dAppConnector, accountId]
+  );
+
   // Submit review to HCS
   const submitReview = useCallback(
     async (reviewData: ReviewData): Promise<string> => {
@@ -282,6 +353,7 @@ export const HederaWalletProvider: React.FC<{ children: React.ReactNode }> = ({ 
     connectWallet,
     disconnectWallet,
     sendHbarTransfer,
+    sendTipViaContract,
     submitReview,
     error,
   };

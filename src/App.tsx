@@ -81,6 +81,7 @@ export default function App() {
     connectWallet: connectHederaWallet,
     disconnectWallet: disconnectHederaWallet,
     sendHbarTransfer,
+    sendTipViaContract,
     submitReview,
     error: hederaError
   } = useHederaWallet();
@@ -484,62 +485,55 @@ export default function App() {
     console.log(`Waiter Receives: ${waiterReceives}`);
 
     if (selectedToken.id === 'hbar') {
-      // Real Hedera transaction
+      // Real Hedera transaction via Smart Contract
       if (!isHederaConnected) {
         throw new Error('Please connect your Hedera wallet first');
       }
 
-      console.log('[HEDERA REAL TRANSACTION]');
-      console.log(`Transferring ${totalAmount} HBAR from ${hederaAccountId} to ${address}`);
+      console.log('[HEDERA CONTRACT TRANSACTION]');
+      console.log(`Sending ${totalAmount} HBAR via HederaTipSplitter contract`);
+      console.log(`Waiter address: ${address}`);
+      console.log(`Cover fee: ${coverFee ? 'Yes (customer pays extra 5%)' : 'No (deducted from tip)'}`);
 
-      const txId = await sendHbarTransfer(address, totalAmount);
-      setTransactionId(txId);
+      // Prepare review text (combining rating and comment)
+      const reviewText = review.trim() || (rating > 0 ? `Rating: ${rating}/5` : '');
 
-      console.log(`Transaction successful! ID: ${txId}`);
+      try {
+        // Send tip via smart contract
+        // The contract will automatically split: 95% to waiter, 5% to platform
+        const txId = await sendTipViaContract(address, totalAmount, reviewText);
+        setTransactionId(txId);
 
-      // Submit review to HCS and save to Firebase if review text or rating is provided
-      if ((review && review.trim()) || rating > 0) {
-        try {
-          console.log('[HCS] Submitting review to blockchain...');
+        console.log(`✅ Contract transaction successful! ID: ${txId}`);
+        console.log(`💰 Waiter receives: ${waiterReceives} HBAR (after 5% platform fee)`);
+        console.log(`🏦 Platform receives: ${totalAmount - waiterReceives} HBAR (5% fee)`);
 
-          const reviewData: ReviewData = {
-            waiterName: waiterData?.name || 'Unknown',
-            waiterId: waiterData?.id || 'unknown',
-            restaurant: waiterData?.restaurant || 'Unknown',
-            rating: rating > 0 ? rating : undefined,
-            comment: review.trim(),
-            tipAmount: waiterReceives,
-            timestamp: Date.now(),
-          };
-
-          const reviewTxId = await submitReview(reviewData);
-          console.log(`[HCS] Review submitted! Transaction ID: ${reviewTxId}`);
-
-          // Save review to Firebase
-          if (db && waiterData?.id) {
-            try {
-              await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'reviews'), {
-                waiterId: waiterData.id,
-                waiterName: waiterData.name,
-                restaurant: waiterData.restaurant,
-                rating: rating > 0 ? rating : null,
-                comment: review.trim(),
-                tipAmount: waiterReceives,
-                totalAmount: totalAmount,
-                coverFee: coverFee,
-                transactionId: reviewTxId,
-                timestamp: serverTimestamp(),
-                network: 'Hedera',
-              });
-              console.log('[Firebase] Review saved successfully');
-            } catch (firebaseError) {
-              console.error('[Firebase] Failed to save review:', firebaseError);
-            }
+        // Save review to Firebase for display purposes
+        if (db && waiterData?.id && ((review && review.trim()) || rating > 0)) {
+          try {
+            await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'reviews'), {
+              waiterId: waiterData.id,
+              waiterName: waiterData.name,
+              restaurant: waiterData.restaurant,
+              rating: rating > 0 ? rating : null,
+              comment: review.trim(),
+              tipAmount: waiterReceives,
+              totalAmount: totalAmount,
+              coverFee: coverFee,
+              transactionId: txId,
+              timestamp: serverTimestamp(),
+              network: 'Hedera',
+              viaContract: true, // Flag to indicate this was sent via contract
+            });
+            console.log('[Firebase] Review saved successfully');
+          } catch (firebaseError) {
+            console.error('[Firebase] Failed to save review:', firebaseError);
+            // Don't throw - transaction was successful, Firebase save is optional
           }
-        } catch (reviewError) {
-          console.error('[HCS] Failed to submit review:', reviewError);
-          // Don't throw - payment was successful, review is optional
         }
+      } catch (contractError: any) {
+        console.error('[CONTRACT] Transaction failed:', contractError);
+        throw new Error(contractError.message || 'Failed to send tip via smart contract');
       }
     } else if (selectedToken.id === 'usdt_base') {
       // For Base network - still simulation (you can integrate wagmi/MetaMask later)
