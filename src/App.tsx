@@ -195,38 +195,50 @@ export default function App() {
   }, []);
 
   const loadWaiterProfile = async (waiterId: string) => {
+    console.log('[QR] Starting to load waiter profile for ID:', waiterId);
+    console.log('[QR] Firebase DB initialized:', !!db);
+
     setLoading(true);
     try {
       if (db) {
         // Try to load from main waiters collection (used by registration)
+        console.log('[QR] Attempting to load from path: waiters/' + waiterId);
         const docRef = doc(db, 'waiters', waiterId);
         const docSnap = await getDoc(docRef);
 
+        console.log('[QR] Document exists in main path:', docSnap.exists());
+
         if (docSnap.exists()) {
           const profile = { id: docSnap.id, ...docSnap.data() } as WaiterProfile;
-          console.log('[QR] Waiter profile loaded:', profile);
+          console.log('[QR] ✅ Waiter profile loaded:', profile);
           openPaymentPage(profile);
         } else {
           // Fallback: try old path for backwards compatibility
+          console.log('[QR] Attempting fallback path: artifacts/' + APP_ID + '/public/data/waiters/' + waiterId);
           const oldDocRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'waiters', waiterId);
           const oldDocSnap = await getDoc(oldDocRef);
 
+          console.log('[QR] Document exists in old path:', oldDocSnap.exists());
+
           if (oldDocSnap.exists()) {
             const profile = { id: oldDocSnap.id, ...oldDocSnap.data() } as WaiterProfile;
-            console.log('[QR] Waiter profile loaded (old path):', profile);
+            console.log('[QR] ✅ Waiter profile loaded (old path):', profile);
             openPaymentPage(profile);
           } else {
-            alert('Waiter profile not found. Please check the QR code or link.');
+            console.error('[QR] ❌ Waiter profile not found in any path');
+            alert('Waiter profile not found. Waiter ID: ' + waiterId + '\n\nPlease make sure you are registered and try again.');
             setView('landing');
           }
         }
       } else {
+        console.log('[QR] Firebase not initialized, using mock waiter');
         // Mock mode - use demo waiter
         openPaymentPage(MOCK_WAITER);
       }
-    } catch (error) {
-      console.error('Error loading waiter profile:', error);
-      alert('Error loading waiter profile');
+    } catch (error: any) {
+      console.error('[QR] ❌ Error loading waiter profile:', error);
+      console.error('[QR] Error details:', error.message, error.code);
+      alert('Error loading waiter profile: ' + (error.message || 'Unknown error'));
       setView('landing');
     } finally {
       setLoading(false);
