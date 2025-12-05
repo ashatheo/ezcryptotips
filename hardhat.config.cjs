@@ -1,4 +1,5 @@
 require("dotenv").config();
+require("@nomicfoundation/hardhat-verify");
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
@@ -39,5 +40,34 @@ module.exports = {
     tests: "./test",
     cache: "./cache",
     artifacts: "./artifacts"
+  },
+  etherscan: {
+    apiKey: {
+      'hedera-testnet': 'UNUSED', // Hedera doesn't require API key
+      'hedera-mainnet': 'UNUSED'
+    },
+    customChains: [
+      {
+        network: "hedera-testnet",
+        chainId: 296,
+        urls: {
+          apiURL: "https://server-verify.hashscan.io",
+          browserURL: "https://hashscan.io/testnet"
+        }
+      },
+      {
+        network: "hedera-mainnet",
+        chainId: 295,
+        urls: {
+          apiURL: "https://server-verify.hashscan.io",
+          browserURL: "https://hashscan.io/mainnet"
+        }
+      }
+    ]
+  },
+  sourcify: {
+    enabled: true,
+    apiUrl: "https://server-verify.hashscan.io",
+    browserUrl: "https://hashscan.io"
   }
 };

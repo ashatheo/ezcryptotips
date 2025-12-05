@@ -1,0 +1,29 @@
+{
+  "contractAddress": "0xcd225A9C29f254a8954496570A8d12A029DBaf34",
+  "contractName": "HederaTipSplitter",
+  "compilerVersion": "v0.8.20+commit.a1b79de6",
+  "optimization": {
+    "enabled": true,
+    "runs": 200
+  },
+  "constructorArguments": "000000000000000000000000f5b21a4054d36990ae1f7d957923bda6e81652fb",
+  "platformWallet": "0xF5b21a4054d36990Ae1F7D957923BDA6e81652fb",
+  "evmVersion": "default",
+  "license": "MIT",
+  "hashscanUrl": "https://hashscan.io/testnet/contract/0xcd225A9C29f254a8954496570A8d12A029DBaf34",
+  "verificationSteps": [
+    "1. Visit: https://hashscan.io/testnet/contract/0xcd225A9C29f254a8954496570A8d12A029DBaf34",
+    "2. Click 'Contract' tab",
+    "3. Click 'Verify and Publish' button",
+    "4. Fill in the form:",
+    "   - Contract Address: 0xcd225A9C29f254a8954496570A8d12A029DBaf34",
+    "   - Compiler Type: Solidity (Single file)",
+    "   - Compiler Version: v0.8.20+commit.a1b79de6",
+    "   - Open Source License Type: MIT",
+    "   - Optimization: Yes",
+    "   - Runs: 200",
+    "5. Paste the contract source code from: verification/HederaTipSplitter_flattened.sol",
+    "6. Constructor Arguments (ABI-encoded): 000000000000000000000000f5b21a4054d36990ae1f7d957923bda6e81652fb",
+    "7. Click 'Verify and Publish'"
+  ]
+}

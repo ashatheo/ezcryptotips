@@ -36,6 +36,7 @@
     "@hashgraph/hardhat-hethers": "^1.0.4",
     "@hashgraph/hethers": "^1.2.6",
     "@nomicfoundation/hardhat-toolbox": "^6.1.0",
+    "@nomicfoundation/hardhat-verify": "^3.0.8",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",

@@ -1,0 +1,75 @@
+
+HEDERA SMART CONTRACT VERIFICATION GUIDE
+=========================================
+
+Contract Address: 0xcd225A9C29f254a8954496570A8d12A029DBaf34
+HashScan URL: https://hashscan.io/testnet/contract/0xcd225A9C29f254a8954496570A8d12A029DBaf34
+
+STEP-BY-STEP INSTRUCTIONS:
+--------------------------
+
+1. Open HashScan
+   Visit: https://hashscan.io/testnet/contract/0xcd225A9C29f254a8954496570A8d12A029DBaf34
+
+2. Navigate to Verification
+   - Click on the "Contract" tab
+   - Click "Verify and Publish" button
+
+3. Fill in the Verification Form:
+
+   Contract Address:
+   0xcd225A9C29f254a8954496570A8d12A029DBaf34
+
+   Compiler Type:
+   Solidity (Single file)
+
+   Compiler Version:
+   v0.8.20+commit.a1b79de6
+
+   Open Source License Type:
+   MIT License (MIT)
+
+   Optimization Enabled:
+   Yes
+
+   Runs (Optimizer):
+   200
+
+4. Paste Contract Source Code:
+   Copy the entire content from: verification/HederaTipSplitter_flattened.sol
+
+5. Constructor Arguments (ABI-encoded):
+   000000000000000000000000f5b21a4054d36990ae1f7d957923bda6e81652fb
+
+   This encodes the platform wallet address: 0xF5b21a4054d36990Ae1F7D957923BDA6e81652fb
+
+6. Click "Verify and Publish"
+
+ALTERNATIVE: Use Hardhat Verify Plugin
+---------------------------------------
+If the manual verification doesn't work, you can try:
+
+npm install --save-dev @nomicfoundation/hardhat-verify
+npx hardhat verify --network hedera-testnet 0xcd225A9C29f254a8954496570A8d12A029DBaf34 0xF5b21a4054d36990Ae1F7D957923BDA6e81652fb
+
+FILES CREATED:
+--------------
+- verification/HederaTipSplitter_flattened.sol (Contract source)
+- verification/verification-info.json (All verification details)
+- verification/VERIFICATION_INSTRUCTIONS.txt (This file)
+
+TROUBLESHOOTING:
+----------------
+1. If verification fails with "Constructor arguments mismatch":
+   - Double check the constructor arguments hex: 000000000000000000000000f5b21a4054d36990ae1f7d957923bda6e81652fb
+   - Make sure it matches the platform wallet: 0xF5b21a4054d36990Ae1F7D957923BDA6e81652fb
+
+2. If compiler version not found:
+   - Try other 0.8.20 versions from the dropdown
+   - Common format: v0.8.20+commit.a1b79de6
+
+3. If source code doesn't match:
+   - Make sure optimization is enabled with 200 runs
+   - Check that you're using the exact source from HederaTipSplitter_flattened.sol
+
+For more help: https://docs.hedera.com/hedera/core-concepts/smart-contracts/verifying-smart-contracts-beta
