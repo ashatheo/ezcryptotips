@@ -48,3 +48,6 @@ typechain-types
 *.md
 !README.md
 !DEPLOYMENT.md
+
+# Deployment info (testnet only - mainnet should be private)
+deployment-mainnet.json

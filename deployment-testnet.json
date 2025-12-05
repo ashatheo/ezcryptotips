@@ -1,0 +1,9 @@
+{
+  "network": "hedera-testnet",
+  "contractAddress": "0xcd225A9C29f254a8954496570A8d12A029DBaf34",
+  "platformWallet": "0xF5b21a4054d36990Ae1F7D957923BDA6e81652fb",
+  "platformFeeBPS": "500",
+  "deployedAt": "2025-12-05T03:52:31.000Z",
+  "deployer": "0xF5b21a4054d36990Ae1F7D957923BDA6e81652fb",
+  "hashscanUrl": "https://hashscan.io/testnet/contract/0xcd225A9C29f254a8954496570A8d12A029DBaf34"
+}
