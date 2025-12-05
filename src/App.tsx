@@ -54,11 +54,40 @@ type TokenOption = {
   addressKey: keyof WaiterProfile;
   disabled?: boolean;
   comingSoon?: boolean;
+  tokenId?: string; // Hedera Token ID for HTS tokens (e.g., USDC)
+  decimals?: number; // Token decimals (HBAR=8, USDC=6)
 };
 
 const AVAILABLE_TOKENS: TokenOption[] = [
-  { id: 'hbar', name: 'Hedera', network: 'Hedera', symbol: 'HBAR', color: HEDERA_GREEN, addressKey: 'hederaId' },
-  { id: 'usdt_base', name: 'Base', network: 'Base', symbol: 'USDT', color: BASE_BLUE, addressKey: 'baseAddress', disabled: true, comingSoon: true },
+  {
+    id: 'hbar',
+    name: 'Hedera',
+    network: 'Hedera',
+    symbol: 'HBAR',
+    color: HEDERA_GREEN,
+    addressKey: 'hederaId',
+    decimals: 8 // HBAR has 8 decimals (1 HBAR = 100,000,000 tinybar)
+  },
+  {
+    id: 'usdc_hedera',
+    name: 'Hedera',
+    network: 'Hedera',
+    symbol: 'USDC',
+    color: '#2775CA', // USDC blue
+    addressKey: 'hederaId',
+    tokenId: '0.0.456858', // USDC on Hedera testnet (placeholder - update with real token ID)
+    decimals: 6 // USDC has 6 decimals
+  },
+  {
+    id: 'usdt_base',
+    name: 'Base',
+    network: 'Base',
+    symbol: 'USDT',
+    color: BASE_BLUE,
+    addressKey: 'baseAddress',
+    disabled: true,
+    comingSoon: true
+  },
 ];
 
 // --- MOCK DATA FOR PREVIEW ---
@@ -169,14 +198,27 @@ export default function App() {
     setLoading(true);
     try {
       if (db) {
-        const docRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'waiters', waiterId);
+        // Try to load from main waiters collection (used by registration)
+        const docRef = doc(db, 'waiters', waiterId);
         const docSnap = await getDoc(docRef);
+
         if (docSnap.exists()) {
           const profile = { id: docSnap.id, ...docSnap.data() } as WaiterProfile;
+          console.log('[QR] Waiter profile loaded:', profile);
           openPaymentPage(profile);
         } else {
-          alert('Waiter profile not found.');
-          setView('landing');
+          // Fallback: try old path for backwards compatibility
+          const oldDocRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'waiters', waiterId);
+          const oldDocSnap = await getDoc(oldDocRef);
+
+          if (oldDocSnap.exists()) {
+            const profile = { id: oldDocSnap.id, ...oldDocSnap.data() } as WaiterProfile;
+            console.log('[QR] Waiter profile loaded (old path):', profile);
+            openPaymentPage(profile);
+          } else {
+            alert('Waiter profile not found. Please check the QR code or link.');
+            setView('landing');
+          }
         }
       } else {
         // Mock mode - use demo waiter
@@ -536,6 +578,29 @@ export default function App() {
       } catch (contractError: any) {
         console.error('[CONTRACT] Transaction failed:', contractError);
         throw new Error(contractError.message || 'Failed to send tip via smart contract');
+      }
+    } else if (selectedToken.id === 'usdc_hedera') {
+      // USDC on Hedera via HTS (Hedera Token Service)
+      if (!isHederaConnected) {
+        throw new Error('Please connect your Hedera wallet first');
+      }
+
+      console.log('[HEDERA USDC TRANSACTION]');
+      console.log(`Sending ${totalAmount} USDC on Hedera`);
+      console.log(`Waiter address: ${address}`);
+      console.log(`Token ID: ${selectedToken.tokenId}`);
+
+      try {
+        // TODO: Implement USDC transfer via HTS
+        // For now, show alert that USDC is coming soon
+        throw new Error('USDC transfers are coming soon! Please use HBAR for now.');
+
+        // Future implementation will be:
+        // const txId = await sendTokenTransfer(selectedToken.tokenId!, address, totalAmount);
+        // setTransactionId(txId);
+      } catch (usdcError: any) {
+        console.error('[USDC] Transaction failed:', usdcError);
+        throw new Error(usdcError.message || 'Failed to send USDC');
       }
     } else if (selectedToken.id === 'usdt_base') {
       // For Base network - still simulation (you can integrate wagmi/MetaMask later)
@@ -1741,10 +1806,13 @@ export default function App() {
                     }`}
                     style={{ borderColor: !token.disabled && selectedToken.id === token.id ? token.color : undefined }}
                   >
-                    <span className="block">{token.name}</span>
-                    {token.comingSoon && (
-                      <span className="text-[10px] text-gray-500 font-normal block mt-0.5">Coming Soon</span>
-                    )}
+                    <div className="text-center">
+                      <span className="block font-bold">{token.symbol}</span>
+                      <span className="text-[10px] text-gray-400 block">{token.network}</span>
+                      {token.comingSoon && (
+                        <span className="text-[9px] text-gray-500 font-normal block mt-0.5">Coming Soon</span>
+                      )}
+                    </div>
                   </button>
                 ))}
               </div>
@@ -1768,7 +1836,7 @@ export default function App() {
             <div className="mb-8">
                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Tip Amount ({selectedToken.symbol})</label>
                <div className="grid grid-cols-3 gap-3 mb-4">
-                 {(selectedToken.id === 'hbar' ? [50, 100, 200] : [5, 10, 20]).map((val) => (
+                 {(selectedToken.id === 'hbar' ? [50, 100, 200] : selectedToken.id === 'usdc_hedera' ? [5, 10, 20] : [5, 10, 20]).map((val) => (
                    <button
                      key={val}
                      onClick={() => setAmount(val.toString())}
