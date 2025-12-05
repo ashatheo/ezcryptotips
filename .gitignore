@@ -38,6 +38,13 @@ firestore-debug.log
 # Misc
 .cache
 
-# Documentation files (except README.md)
+# Hardhat files
+cache
+artifacts
+typechain
+typechain-types
+
+# Documentation files (except README.md and DEPLOYMENT.md)
 *.md
 !README.md
+!DEPLOYMENT.md
