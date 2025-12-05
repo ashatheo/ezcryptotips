@@ -15,7 +15,7 @@ import {
   ContractExecuteTransaction,
   ContractFunctionParameters,
 } from '@hashgraph/sdk';
-import { encodeSendTipData, getContractAddress, hbarToTinybar } from './lib/contractUtils';
+import { encodeSendTipData, getContractAddress, hbarToTinybar, hederaIdToEvmAddress } from './lib/contractUtils';
 
 // --- TYPES ---
 export interface ReviewData {
@@ -225,13 +225,17 @@ export const HederaWalletProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
         console.log('[CONTRACT] Sending tip via HederaTipSplitter');
         console.log('[CONTRACT] Contract address:', getContractAddress());
-        console.log('[CONTRACT] Waiter address:', waiterAddress);
+        console.log('[CONTRACT] Original waiter address:', waiterAddress);
         console.log('[CONTRACT] Tip amount:', tipAmount, 'HBAR');
         console.log('[CONTRACT] Review text:', reviewText || '(empty)');
 
+        // Convert Hedera ID to EVM address if needed
+        const evmWaiterAddress = hederaIdToEvmAddress(waiterAddress);
+        console.log('[CONTRACT] EVM waiter address:', evmWaiterAddress);
+
         // Encode the contract function call
         const functionParameters = new ContractFunctionParameters()
-          .addAddress(waiterAddress)
+          .addAddress(evmWaiterAddress)
           .addString(reviewText || '');
 
         // Create contract execute transaction

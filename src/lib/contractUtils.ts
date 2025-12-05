@@ -6,18 +6,38 @@ const CONTRACT_ADDRESS = import.meta.env.VITE_TIP_SPLITTER_CONTRACT_ADDRESS;
 
 /**
  * Convert Hedera Account ID (0.0.xxxxx) to EVM address
- * Note: This is a simplified conversion. For production, you should use proper conversion logic
- * or ensure waiters provide both Hedera ID and EVM address
+ * Hedera accounts can be represented as EVM addresses by converting the account number
+ * to a 20-byte (40 hex characters) address
  */
 export function hederaIdToEvmAddress(hederaId: string): string {
-  // For now, we'll just validate the format
-  // In production, you'd need to convert properly or store both IDs
-  if (!hederaId.startsWith('0.0.')) {
-    // It might already be an EVM address
+  // If it's already an EVM address, return it
+  if (hederaId.startsWith('0x') && hederaId.length === 42) {
     return hederaId;
   }
 
-  throw new Error('Please provide EVM address format (0x...) for contract interactions');
+  // Check if it's a Hedera ID format (0.0.xxxxx)
+  if (!hederaId.startsWith('0.0.')) {
+    throw new Error('Invalid Hedera ID or EVM address format');
+  }
+
+  // Extract the account number from Hedera ID
+  const parts = hederaId.split('.');
+  if (parts.length !== 3) {
+    throw new Error('Invalid Hedera ID format. Expected: 0.0.xxxxx');
+  }
+
+  const accountNum = parseInt(parts[2], 10);
+  if (isNaN(accountNum)) {
+    throw new Error('Invalid account number in Hedera ID');
+  }
+
+  // Convert account number to EVM address (20 bytes = 40 hex chars)
+  // Pad the account number to 40 hex characters
+  const evmAddress = '0x' + accountNum.toString(16).padStart(40, '0');
+
+  console.log(`[CONTRACT] Converted Hedera ID ${hederaId} to EVM address ${evmAddress}`);
+
+  return evmAddress;
 }
 
 /**
