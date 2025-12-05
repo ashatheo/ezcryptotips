@@ -70,12 +70,43 @@ export function calculateTipSplit(tipAmount: number): { waiterAmount: number; pl
 }
 
 /**
+ * Convert EVM address to Hedera Contract ID
+ * For use with Hedera SDK ContractExecuteTransaction
+ */
+export function evmAddressToHederaId(evmAddress: string): string {
+  // If it's already a Hedera ID, return it
+  if (evmAddress.startsWith('0.0.')) {
+    return evmAddress;
+  }
+
+  // Remove 0x prefix
+  const hex = evmAddress.startsWith('0x') ? evmAddress.slice(2) : evmAddress;
+
+  // Convert hex to decimal
+  const accountNum = parseInt(hex, 16);
+
+  // Return in Hedera ID format
+  const hederaId = `0.0.${accountNum}`;
+  console.log(`[CONTRACT] Converted EVM address ${evmAddress} to Hedera ID ${hederaId}`);
+
+  return hederaId;
+}
+
+/**
  * Get contract address
+ * Should be in Hedera ID format (0.0.xxxxx) for use with ContractExecuteTransaction
  */
 export function getContractAddress(): string {
   if (!CONTRACT_ADDRESS) {
     throw new Error('Contract address not configured. Please set VITE_TIP_SPLITTER_CONTRACT_ADDRESS in .env');
   }
+
+  // If it's an EVM address, convert to Hedera ID (fallback for legacy configs)
+  if (CONTRACT_ADDRESS.startsWith('0x')) {
+    console.warn('[CONTRACT] Contract address is in EVM format. Please update .env to use Hedera Contract ID (0.0.xxxxx)');
+    return evmAddressToHederaId(CONTRACT_ADDRESS);
+  }
+
   return CONTRACT_ADDRESS;
 }
 
