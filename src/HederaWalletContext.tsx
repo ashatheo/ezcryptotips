@@ -229,8 +229,8 @@ export const HederaWalletProvider: React.FC<{ children: React.ReactNode }> = ({ 
         console.log('[CONTRACT] Tip amount:', tipAmount, 'HBAR');
         console.log('[CONTRACT] Review text:', reviewText || '(empty)');
 
-        // Convert Hedera ID to EVM address if needed
-        const evmWaiterAddress = hederaIdToEvmAddress(waiterAddress);
+        // Convert Hedera ID to EVM address if needed (using mirror node)
+        const evmWaiterAddress = await hederaIdToEvmAddress(waiterAddress);
         console.log('[CONTRACT] EVM waiter address:', evmWaiterAddress);
 
         // Encode the contract function call
@@ -239,11 +239,19 @@ export const HederaWalletProvider: React.FC<{ children: React.ReactNode }> = ({ 
           .addString(reviewText || '');
 
         // Create contract execute transaction
+        // Set node account IDs for testnet
+        const nodeAccountIds = [
+          AccountId.fromString('0.0.3'),
+          AccountId.fromString('0.0.4'),
+          AccountId.fromString('0.0.5')
+        ];
+
         const transaction = new ContractExecuteTransaction()
           .setContractId(getContractAddress())
           .setGas(300000) // Gas limit for contract execution
           .setPayableAmount(new Hbar(tipAmount)) // Send HBAR with the transaction
-          .setFunction('sendTip', functionParameters);
+          .setFunction('sendTip', functionParameters)
+          .setNodeAccountIds(nodeAccountIds);
 
         console.log('[CONTRACT] Transaction created, freezing...');
 
@@ -269,9 +277,40 @@ export const HederaWalletProvider: React.FC<{ children: React.ReactNode }> = ({ 
         // Extract transaction ID from result
         if (result && result.response) {
           const txId = result.response.transactionId || 'Transaction submitted';
-          console.log('[CONTRACT] ✅ Tip sent successfully! Transaction ID:', txId);
-          console.log('[CONTRACT] 💰 Amount:', tipAmount, 'HBAR (5% fee auto-split by contract)');
-          return txId;
+          console.log('[CONTRACT] Transaction ID:', txId);
+
+          // Wait a bit and check transaction status from mirror node
+          console.log('[CONTRACT] Verifying transaction status...');
+          await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds for consensus
+
+          try {
+            const statusResponse = await fetch(`https://testnet.mirrornode.hedera.com/api/v1/transactions/${txId}`);
+            const statusData = await statusResponse.json();
+
+            console.log('[CONTRACT] Transaction status:', statusData);
+
+            if (statusData.transactions && statusData.transactions.length > 0) {
+              const tx = statusData.transactions[0];
+              const status = tx.result;
+
+              if (status === 'SUCCESS') {
+                console.log('[CONTRACT] ✅ Tip sent successfully!');
+                console.log('[CONTRACT] 💰 Amount:', tipAmount, 'HBAR (5% fee auto-split by contract)');
+                return txId;
+              } else {
+                console.error('[CONTRACT] ❌ Transaction failed with status:', status);
+                throw new Error(`Transaction failed: ${status}`);
+              }
+            } else {
+              console.warn('[CONTRACT] ⏳ Transaction not yet confirmed on network');
+              // Still return txId but note it's pending
+              return txId;
+            }
+          } catch (statusError) {
+            console.warn('[CONTRACT] Could not verify transaction status:', statusError);
+            // Return txId anyway, let user check manually
+            return txId;
+          }
         }
 
         return 'Transaction submitted successfully';

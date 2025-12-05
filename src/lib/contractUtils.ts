@@ -6,38 +6,62 @@ const CONTRACT_ADDRESS = import.meta.env.VITE_TIP_SPLITTER_CONTRACT_ADDRESS;
 
 /**
  * Convert Hedera Account ID (0.0.xxxxx) to EVM address
- * Hedera accounts can be represented as EVM addresses by converting the account number
- * to a 20-byte (40 hex characters) address
+ * Uses Hedera Mirror Node API to get the actual EVM address or alias
+ * Supports 3 formats:
+ * 1. No checksum: 0.0.7370967
+ * 2. With checksum: 0.0.7370967-qqwnm
+ * 3. EVM address: 0xe030c8f3763ca9d6743f2c7a2cf250fb377bf682
+ * @param hederaId - Hedera account ID or EVM address
+ * @returns Promise<string> - EVM address (0x...)
  */
-export function hederaIdToEvmAddress(hederaId: string): string {
+export async function hederaIdToEvmAddress(hederaId: string): Promise<string> {
   // If it's already an EVM address, return it
   if (hederaId.startsWith('0x') && hederaId.length === 42) {
+    console.log(`[CONTRACT] Address already in EVM format: ${hederaId}`);
     return hederaId;
   }
 
-  // Check if it's a Hedera ID format (0.0.xxxxx)
+  // Check if it's a Hedera ID format (0.0.xxxxx or 0.0.xxxxx-checksum)
   if (!hederaId.startsWith('0.0.')) {
     throw new Error('Invalid Hedera ID or EVM address format');
   }
 
-  // Extract the account number from Hedera ID
-  const parts = hederaId.split('.');
-  if (parts.length !== 3) {
-    throw new Error('Invalid Hedera ID format. Expected: 0.0.xxxxx');
+  // Remove checksum if present (format: 0.0.xxxxx-qqwnm)
+  // Mirror Node API doesn't accept checksums
+  const cleanHederaId = hederaId.split('-')[0];
+
+  console.log(`[CONTRACT] Original input: ${hederaId}`);
+  if (hederaId !== cleanHederaId) {
+    console.log(`[CONTRACT] Removed checksum: ${cleanHederaId}`);
   }
 
-  const accountNum = parseInt(parts[2], 10);
-  if (isNaN(accountNum)) {
-    throw new Error('Invalid account number in Hedera ID');
+  console.log(`[CONTRACT] Looking up EVM address for Hedera ID: ${cleanHederaId}`);
+
+  try {
+    // Query mirror node for account info
+    const response = await fetch(`https://testnet.mirrornode.hedera.com/api/v1/accounts/${cleanHederaId}`);
+
+    if (!response.ok) {
+      throw new Error(`Mirror node returned ${response.status}: ${response.statusText}`);
+    }
+
+    const accountData = await response.json();
+
+    // Get EVM address from mirror node response
+    if (accountData.evm_address) {
+      const evmAddress = accountData.evm_address;
+      console.log(`[CONTRACT] ✅ Found EVM address for ${cleanHederaId}: ${evmAddress}`);
+      return evmAddress;
+    }
+
+    // Fallback: If no EVM address exists, throw error
+    // On Hedera, accounts without EVM alias cannot receive contract transfers
+    throw new Error(`Account ${cleanHederaId} does not have an EVM address. Please use an account with EVM alias.`);
+
+  } catch (error: any) {
+    console.error(`[CONTRACT] Failed to get EVM address for ${cleanHederaId}:`, error);
+    throw new Error(`Cannot convert Hedera ID to EVM address: ${error.message}`);
   }
-
-  // Convert account number to EVM address (20 bytes = 40 hex chars)
-  // Pad the account number to 40 hex characters
-  const evmAddress = '0x' + accountNum.toString(16).padStart(40, '0');
-
-  console.log(`[CONTRACT] Converted Hedera ID ${hederaId} to EVM address ${evmAddress}`);
-
-  return evmAddress;
 }
 
 /**
