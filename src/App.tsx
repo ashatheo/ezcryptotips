@@ -52,11 +52,13 @@ type TokenOption = {
   symbol: string;
   color: string;
   addressKey: keyof WaiterProfile;
+  disabled?: boolean;
+  comingSoon?: boolean;
 };
 
 const AVAILABLE_TOKENS: TokenOption[] = [
   { id: 'hbar', name: 'Hedera', network: 'Hedera', symbol: 'HBAR', color: HEDERA_GREEN, addressKey: 'hederaId' },
-  { id: 'usdt_base', name: 'Base', network: 'Base', symbol: 'USDT', color: BASE_BLUE, addressKey: 'baseAddress' },
+  { id: 'usdt_base', name: 'Base', network: 'Base', symbol: 'USDT', color: BASE_BLUE, addressKey: 'baseAddress', disabled: true, comingSoon: true },
 ];
 
 // --- MOCK DATA FOR PREVIEW ---
@@ -600,7 +602,7 @@ export default function App() {
               </div>
 
               <p className="text-xl md:text-2xl text-gray-400 max-w-3xl mx-auto leading-relaxed">
-                Instant crypto tips on <span className="text-[#00eb78] font-semibold">Hedera</span> and <span className="text-[#0052FF] font-semibold">Base</span> networks.
+                Instant crypto tips on <span className="text-[#00eb78] font-semibold">Hedera</span> network.
                 Direct to waiters. Zero intermediaries. Built on blockchain.
               </p>
 
@@ -690,12 +692,12 @@ export default function App() {
 
               {/* Feature 2 */}
               <div className="bg-black/40 border border-gray-800 rounded-3xl p-8 hover:border-[#0052FF]/50 transition-all">
-                <div className="w-14 h-14 bg-[#0052FF]/10 rounded-2xl flex items-center justify-center mb-6">
-                  <Coins size={28} color={BASE_BLUE} />
+                <div className="w-14 h-14 bg-[#00eb78]/10 rounded-2xl flex items-center justify-center mb-6">
+                  <Coins size={28} color={HEDERA_GREEN} />
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-3">Multi-Chain Support</h3>
+                <h3 className="text-2xl font-bold text-white mb-3">Smart Contract Integration</h3>
                 <p className="text-gray-400 leading-relaxed">
-                  Accept tips on Hedera (HBAR) and Base (USDT). Choose what works best for you.
+                  Automated 95/5 split via Hedera smart contract. Instant, secure, transparent on-chain transactions.
                 </p>
               </div>
 
@@ -799,7 +801,7 @@ export default function App() {
                 </div>
                 <h3 className="text-2xl font-bold text-white mb-3">Register</h3>
                 <p className="text-gray-400 leading-relaxed">
-                  Create your account and add your crypto wallet addresses (Hedera or Base)
+                  Create your account and add your Hedera wallet address
                 </p>
               </div>
 
@@ -877,7 +879,7 @@ export default function App() {
         <footer className="py-8 px-6 border-t border-gray-800">
           <div className="max-w-6xl mx-auto text-center">
             <p className="text-gray-500 text-sm">
-              Powered by <span className="text-[#00eb78]">Hedera</span> and <span className="text-[#0052FF]">Base</span>
+              Powered by <span className="text-[#00eb78] font-semibold">Hedera</span> blockchain
             </p>
           </div>
         </footer>
@@ -1728,15 +1730,21 @@ export default function App() {
                 {AVAILABLE_TOKENS.map((token) => (
                   <button
                     key={token.id}
-                    onClick={() => setSelectedToken(token)}
-                    className={`p-2 rounded-lg text-sm font-bold border transition-all ${
-                      selectedToken.id === token.id 
-                        ? `bg-gray-800 border-[${token.color}] text-white` 
-                        : 'bg-black border-gray-800 text-gray-500 hover:border-gray-600'
+                    onClick={() => !token.disabled && setSelectedToken(token)}
+                    disabled={token.disabled}
+                    className={`p-2 rounded-lg text-sm font-bold border transition-all relative ${
+                      token.disabled
+                        ? 'bg-black border-gray-800 text-gray-600 opacity-50 cursor-not-allowed'
+                        : selectedToken.id === token.id
+                          ? `bg-gray-800 border-[${token.color}] text-white`
+                          : 'bg-black border-gray-800 text-gray-500 hover:border-gray-600'
                     }`}
-                    style={{ borderColor: selectedToken.id === token.id ? token.color : undefined }}
+                    style={{ borderColor: !token.disabled && selectedToken.id === token.id ? token.color : undefined }}
                   >
-                    {token.name}
+                    <span className="block">{token.name}</span>
+                    {token.comingSoon && (
+                      <span className="text-[10px] text-gray-500 font-normal block mt-0.5">Coming Soon</span>
+                    )}
                   </button>
                 ))}
               </div>
