@@ -1,13 +1,12 @@
 /**
  * WaiterRatingCard Component
- * Displays waiter rating (max 5.0) and last 3 reviews
+ * Displays waiter rating (max 5.0) based on last 40 reviews
  * Shows on waiter profile page and payment page
  */
 
 import React, { useEffect, useState } from 'react';
-import { StarRating } from './StarRating';
 import { getWaiterReviews, calculateAverageRating, type StoredReview } from '../lib/hcsReviewService';
-import { Shield, MessageSquare } from 'lucide-react';
+import { Shield, MessageSquare, Star } from 'lucide-react';
 
 interface WaiterRatingCardProps {
   waiterId: string;
@@ -62,13 +61,8 @@ export const WaiterRatingCard: React.FC<WaiterRatingCardProps> = ({
       <div className={`${compact ? 'p-4' : 'p-6'} bg-black border border-gray-800 rounded-xl`}>
         <div className="text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <StarRating
-              rating={0}
-              onRatingChange={() => {}}
-              size={compact ? 18 : 24}
-              color="#00eb78"
-              readonly
-            />
+            <Star className="w-6 h-6 text-gray-600" />
+            <span className="text-2xl font-bold text-gray-600">—</span>
           </div>
           <p className="text-gray-500 text-sm">No ratings yet</p>
           <p className="text-gray-600 text-xs mt-1">Be the first to leave a review!</p>
@@ -82,23 +76,16 @@ export const WaiterRatingCard: React.FC<WaiterRatingCardProps> = ({
       {/* Rating Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-3xl font-bold text-white">{averageRating.toFixed(1)}</span>
-              <span className="text-gray-500 text-sm">/5.0</span>
-            </div>
-            <StarRating
-              rating={Math.round(averageRating)}
-              onRatingChange={() => {}}
-              size={compact ? 16 : 20}
-              color="#00eb78"
-              readonly
-            />
+          <div className="flex items-center gap-2">
+            <Star className="w-6 h-6 text-[#00eb78] fill-[#00eb78]" />
+            <span className="text-3xl font-bold text-white">{averageRating.toFixed(1)}</span>
+            <span className="text-gray-500 text-sm">/5.0</span>
           </div>
         </div>
         <div className="text-right">
           <p className="text-gray-400 text-sm">{totalRatings} {totalRatings === 1 ? 'rating' : 'ratings'}</p>
-          <div className="flex items-center gap-1 text-xs text-[#00eb78] mt-1">
+          <p className="text-gray-600 text-xs mt-0.5">based on last 40</p>
+          <div className="flex items-center justify-end gap-1 text-xs text-[#00eb78] mt-1">
             <Shield className="w-3 h-3" />
             <span>HCS Verified</span>
           </div>
@@ -120,15 +107,10 @@ export const WaiterRatingCard: React.FC<WaiterRatingCardProps> = ({
             >
               {/* Rating */}
               {review.rating && review.rating > 0 && (
-                <div className="flex items-center gap-2 mb-2">
-                  <StarRating
-                    rating={review.rating}
-                    onRatingChange={() => {}}
-                    size={14}
-                    color="#00eb78"
-                    readonly
-                  />
-                  <span className="text-xs text-gray-400">{review.rating}/5</span>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Star className="w-4 h-4 text-[#00eb78] fill-[#00eb78]" />
+                  <span className="text-sm font-semibold text-white">{review.rating.toFixed(1)}</span>
+                  <span className="text-xs text-gray-500">/5</span>
                 </div>
               )}
 

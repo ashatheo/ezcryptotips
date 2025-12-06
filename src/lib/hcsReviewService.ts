@@ -22,8 +22,9 @@ import { collection, addDoc, serverTimestamp, query, where, getDocs, orderBy, li
 
 const APP_ID = 'ez-crypto-tips';
 
-// HCS Topic ID from environment
-const HCS_TOPIC_ID = import.meta.env.VITE_HCS_TOPIC_ID || '0.0.5158297';
+// HCS Topic ID - hardcoded to avoid Vite converting to scientific notation
+// IMPORTANT: Vite may convert "0.0.5158297" to number like 2.48e+47 - always use string literal
+const HCS_TOPIC_ID = '0.0.5158297';
 
 export interface ReviewData {
   waiterId: string;
@@ -219,7 +220,7 @@ export function getReviewHashScanUrl(messageId: string): string {
 }
 
 /**
- * Calculate average rating from reviews
+ * Calculate average rating from last 40 reviews
  */
 export function calculateAverageRating(reviews: StoredReview[]): {
   average: number;
@@ -234,11 +235,13 @@ export function calculateAverageRating(reviews: StoredReview[]): {
     return { average: 0, total: 0 };
   }
 
-  const sum = validReviews.reduce((acc, r) => acc + r.rating, 0);
-  const average = sum / validReviews.length;
+  // Use only last 40 reviews for average calculation
+  const last40Reviews = validReviews.slice(0, 40);
+  const sum = last40Reviews.reduce((acc, r) => acc + r.rating, 0);
+  const average = sum / last40Reviews.length;
 
   return {
     average: Math.round(average * 10) / 10, // Round to 1 decimal
-    total: validReviews.length,
+    total: validReviews.length, // Total count of all ratings
   };
 }
