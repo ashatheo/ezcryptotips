@@ -105,7 +105,7 @@ const MOCK_WAITER: WaiterProfile = {
 
 export default function App() {
   // Auth Hook
-  const { user, profile, login, loginWithGoogle, register, registerWithGoogle, logout, loading: authLoading, updateUserProfile } = useAuth();
+  const { user, profile, login, loginWithGoogle, register, registerWithGoogle, completeGoogleProfile, logout, loading: authLoading, updateUserProfile } = useAuth();
 
   // Hedera Wallet Hook
   const {
@@ -459,8 +459,8 @@ export default function App() {
         throw new Error('No Google user data found');
       }
 
-      // Register with Google using stored data
-      await registerWithGoogle({
+      // Complete Google profile (user already authenticated)
+      await completeGoogleProfile({
         name: regForm.name,
         restaurant: regForm.restaurant,
         hederaId: regForm.hederaId,
@@ -470,7 +470,8 @@ export default function App() {
       alert('Registration successful!');
       setGoogleUserData(null);
 
-      // Let the AUTO-LOGIN effect handle redirect to dashboard
+      // Redirect to dashboard
+      setView('dashboard');
     } catch (error: any) {
       console.error("Google registration error: ", error);
       alert(error.message || "Google registration error. Check console.");

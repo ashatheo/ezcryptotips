@@ -53,6 +53,12 @@ interface AuthContextType {
     hederaId: string;
     baseAddress?: string;
   }) => Promise<void>;
+  completeGoogleProfile: (profileData: {
+    name: string;
+    restaurant: string;
+    hederaId: string;
+    baseAddress?: string;
+  }) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateUserProfile: (updates: Partial<WaiterProfile>) => Promise<void>;
@@ -313,6 +319,74 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, firebaseAu
     }
   };
 
+  // Complete Google profile (user already authenticated)
+  const completeGoogleProfile = async (profileData: {
+    name: string;
+    restaurant: string;
+    hederaId: string;
+    baseAddress?: string;
+  }) => {
+    try {
+      setError(null);
+
+      if (!firebaseAuth || !firebaseDb) {
+        throw new Error('Firebase not initialized');
+      }
+
+      // Get current user (already authenticated)
+      const currentUser = firebaseAuth.currentUser;
+      if (!currentUser) {
+        throw new Error('No authenticated user found');
+      }
+
+      const { uid, email, displayName, photoURL } = currentUser;
+
+      if (!email) {
+        throw new Error('No email found in user account');
+      }
+
+      // Check if profile already exists
+      const profileRef = doc(firebaseDb, 'waiters', uid);
+      const profileSnap = await getDoc(profileRef);
+
+      if (profileSnap.exists()) {
+        // Profile already exists - just load it
+        await loadProfile(uid);
+        return;
+      }
+
+      // Create QR code URL
+      const qrCodeUrl = `${window.location.origin}${window.location.pathname}?waiter=${uid}`;
+
+      // Create Firestore profile
+      const waiterProfile: Partial<WaiterProfile> = {
+        uid,
+        email,
+        name: profileData.name || displayName || 'Unknown',
+        restaurant: profileData.restaurant,
+        hederaId: profileData.hederaId,
+        baseAddress: profileData.baseAddress || '',
+        bio: '',
+        photoURL: photoURL || '',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        isActive: true,
+        qrCodeUrl
+      };
+
+      await setDoc(doc(firebaseDb, 'waiters', uid), waiterProfile);
+
+      // Load the profile
+      await loadProfile(uid);
+
+      console.log('Google profile completion successful');
+    } catch (err: any) {
+      console.error('Complete Google profile error:', err);
+      setError(err.message || 'Failed to complete Google profile');
+      throw err;
+    }
+  };
+
   // Logout
   const logout = async () => {
     try {
@@ -378,6 +452,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, firebaseAu
     loginWithGoogle,
     register,
     registerWithGoogle,
+    completeGoogleProfile,
     logout,
     resetPassword,
     updateUserProfile,
