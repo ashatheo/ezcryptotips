@@ -1214,12 +1214,6 @@ export default function App() {
       <div className="min-h-screen bg-black flex flex-col p-6 font-sans">
         <div className="max-w-md w-full mx-auto bg-[#181818] rounded-3xl border border-gray-800 overflow-hidden shadow-2xl">
           <div className="p-8 border-b border-gray-800">
-            <button onClick={() => {
-              setView('register');
-              setGoogleUserData(null);
-            }} className="text-gray-400 hover:text-white mb-6 transition-colors">
-              <ArrowLeft size={24} />
-            </button>
             <h2 className="text-3xl font-bold text-white mb-1">Complete Your Profile</h2>
             <p className="text-gray-400">Just a few more details to get started</p>
           </div>
