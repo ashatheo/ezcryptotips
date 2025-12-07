@@ -319,8 +319,8 @@ export default function App() {
         return;
       }
 
-      if (!regForm.hederaId && !regForm.baseAddress) {
-        alert("Please provide at least one payment address (Hedera or Base).");
+      if (!regForm.hederaId) {
+        alert("Please provide your Hedera Account ID.");
         setLoading(false);
         return;
       }
@@ -443,8 +443,8 @@ export default function App() {
 
     try {
       // Validation
-      if (!regForm.hederaId && !regForm.baseAddress) {
-        alert("Please provide at least one payment address (Hedera or Base).");
+      if (!regForm.hederaId) {
+        alert("Please provide your Hedera Account ID.");
         setLoading(false);
         return;
       }
@@ -1152,12 +1152,13 @@ export default function App() {
             </div>
 
             <div className="pt-4 border-t border-gray-800">
-              <p className="text-gray-400 text-sm mb-4">Add at least one wallet address:</p>
-              
+              <p className="text-gray-400 text-sm mb-4">Hedera Wallet Address *</p>
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-[#00eb78] mb-1">Hedera Account ID</label>
                   <input
+                    required
                     type="text"
                     className="w-full bg-black text-white p-3 border border-gray-700 rounded-xl focus:border-[#00eb78] outline-none font-mono text-sm"
                     placeholder="0.0.xxxxx"
@@ -1166,15 +1167,18 @@ export default function App() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-[#0052FF] mb-1">Base Address (EVM)</label>
-                  <input 
-                    type="text" 
-                    className="w-full bg-black text-white p-3 border border-gray-700 rounded-xl focus:border-[#0052FF] outline-none font-mono text-sm"
-                    placeholder="0x..."
-                    value={regForm.baseAddress}
-                    onChange={e => setRegForm({...regForm, baseAddress: e.target.value})}
-                  />
+                <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+                  <p className="text-gray-400 text-sm mb-2">
+                    Don't have a Hedera wallet yet?
+                  </p>
+                  <a
+                    href="https://www.hashpack.app/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-[#00eb78] hover:text-[#00c96d] text-sm font-semibold transition-colors"
+                  >
+                    Create Hedera Wallet →
+                  </a>
                 </div>
               </div>
             </div>
@@ -1271,12 +1275,13 @@ export default function App() {
             </div>
 
             <div className="pt-4 border-t border-gray-800">
-              <p className="text-gray-400 text-sm mb-4">Add at least one wallet address *</p>
+              <p className="text-gray-400 text-sm mb-4">Hedera Wallet Address *</p>
 
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-[#00eb78] mb-1">Hedera Account ID</label>
                   <input
+                    required
                     type="text"
                     className="w-full bg-black text-white p-3 border border-gray-700 rounded-xl focus:border-[#00eb78] outline-none font-mono text-sm"
                     placeholder="0.0.xxxxx"
@@ -1285,15 +1290,18 @@ export default function App() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-[#0052FF] mb-1">Base Address (EVM)</label>
-                  <input
-                    type="text"
-                    className="w-full bg-black text-white p-3 border border-gray-700 rounded-xl focus:border-[#0052FF] outline-none font-mono text-sm"
-                    placeholder="0x..."
-                    value={regForm.baseAddress}
-                    onChange={e => setRegForm({...regForm, baseAddress: e.target.value})}
-                  />
+                <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+                  <p className="text-gray-400 text-sm mb-2">
+                    Don't have a Hedera wallet yet?
+                  </p>
+                  <a
+                    href="https://www.hashpack.app/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-[#00eb78] hover:text-[#00c96d] text-sm font-semibold transition-colors"
+                  >
+                    Create Hedera Wallet →
+                  </a>
                 </div>
               </div>
             </div>
