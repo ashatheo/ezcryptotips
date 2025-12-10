@@ -32,7 +32,7 @@ const ReviewCard = React.forwardRef<HTMLDivElement, ReviewCardProps>(
       <motion.div
         ref={ref}
         className={cn(
-          "bg-card text-card-foreground border rounded-xl p-6 shadow-sm w-full max-w-md",
+          "bg-card border rounded-xl p-6 shadow-sm w-full max-w-md",
           className
         )}
         variants={cardVariants}
@@ -52,21 +52,21 @@ const ReviewCard = React.forwardRef<HTMLDivElement, ReviewCardProps>(
               className="w-12 h-12 rounded-full object-cover"
             />
             <div>
-              <h3 id="review-author" className="text-lg font-semibold">
+              <h3 id="review-author" className="text-lg font-semibold text-white">
                 {name}
               </h3>
-              <p className="text-sm text-muted-foreground">{handle}</p>
+              <p className="text-sm text-gray-400">{handle}</p>
             </div>
           </div>
           {/* Rating Section */}
-          <div className="flex items-center gap-1 text-lg font-bold">
+          <div className="flex items-center gap-1 text-lg font-bold text-white">
             <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
             <span>{rating.toFixed(1)}</span>
           </div>
         </div>
 
         {/* Card Body */}
-        <p id="review-content" className="mt-4 text-sm text-muted-foreground">
+        <p id="review-content" className="mt-4 text-sm text-gray-300">
           {review}
         </p>
       </motion.div>
