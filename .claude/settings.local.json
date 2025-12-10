@@ -16,7 +16,20 @@
       "Bash(cat:*)",
       "Bash(test:*)",
       "Bash(mkdir:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(timeout 10 npm run dev:*)",
+      "Bash(timeout 15 npm run dev)",
+      "Bash(node -e:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(node scripts/cleanup-firestore.js:*)",
+      "Bash(node scripts/cleanup-firestore.cjs:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(gh api:*)",
+      "Bash(node scripts/create-hcs-topic.js:*)",
+      "Bash(node scripts/create-hcs-topic.cjs:*)"
     ],
     "deny": [],
     "ask": []

@@ -23,8 +23,9 @@ import { collection, addDoc, serverTimestamp, query, where, getDocs, orderBy, li
 const APP_ID = 'ez-crypto-tips';
 
 // HCS Topic ID - hardcoded to avoid Vite converting to scientific notation
-// IMPORTANT: Vite may convert "0.0.5158297" to number like 2.48e+47 - always use string literal
-const HCS_TOPIC_ID = '0.0.5158297';
+// IMPORTANT: Vite may convert "0.0.7415185" to number like 2.48e+47 - always use string literal
+// Created: 2025-12-10 - Topic for Ez Crypto Tips Reviews Storage
+const HCS_TOPIC_ID = '0.0.7415185';
 
 export interface ReviewData {
   waiterId: string;
