@@ -353,10 +353,18 @@ export const HederaWalletProvider: React.FC<{ children: React.ReactNode }> = ({ 
         console.log('[HCS] Submitting review to topic:', REVIEWS_TOPIC_ID);
         console.log('[HCS] Review data:', reviewMessage);
 
+        // Set node account IDs for testnet
+        const nodeAccountIds = [
+          AccountId.fromString('0.0.3'),
+          AccountId.fromString('0.0.4'),
+          AccountId.fromString('0.0.5')
+        ];
+
         // Create topic message submit transaction
         const transaction = new TopicMessageSubmitTransaction()
           .setTopicId(TopicId.fromString(REVIEWS_TOPIC_ID))
-          .setMessage(reviewMessage);
+          .setMessage(reviewMessage)
+          .setNodeAccountIds(nodeAccountIds);
 
         // Freeze transaction
         const frozenTransaction = await transaction.freezeWithSigner(
