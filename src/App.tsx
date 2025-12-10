@@ -559,8 +559,10 @@ export default function App() {
       const reviewText = review.trim() || (rating > 0 ? `Rating: ${rating}/5` : '');
 
       try {
-        // Send tip via smart contract
-        // The contract will automatically split: 95% to waiter, 5% to platform
+        // STEP 1: Send tip via smart contract (First wallet confirmation)
+        console.log('[STEP 1/2] Sending tip via smart contract...');
+        console.log('[WALLET] Please confirm the tip transaction in your wallet');
+
         const txId = await sendTipViaContract(address, totalAmount, reviewText);
         setTransactionId(txId);
 
@@ -568,16 +570,17 @@ export default function App() {
         console.log(`💰 Waiter receives: ${waiterReceives} HBAR (after 5% platform fee)`);
         console.log(`🏦 Platform receives: ${totalAmount - waiterReceives} HBAR (5% fee)`);
 
-        // Submit review to HCS (Hedera Consensus Service) for tamper-proof storage
+        // STEP 2: Submit review to HCS (Second wallet confirmation - if review exists)
         if (waiterData?.id && ((review && review.trim()) || rating > 0)) {
-          try {
-            console.log('[HCS] Submitting review to HCS...');
+          console.log('[STEP 2/2] Submitting review to HCS...');
+          console.log('[WALLET] Please confirm the review submission in your wallet');
 
+          try {
             // Check for duplicate review
             const isDuplicate = await checkDuplicateReview(txId, waiterData.id);
             if (isDuplicate) {
               console.log('[HCS] ⚠️ Duplicate review prevented - review already exists for this transaction');
-              // Don't submit duplicate, but don't throw error either
+              alert('You already submitted a review for this transaction.');
               return;
             }
 
@@ -603,13 +606,24 @@ export default function App() {
               tipAmount: waiterReceives,
               timestamp: Date.now(),
             });
+
             console.log('[HCS] ✅ Review submitted to Hedera Consensus Service');
             console.log('[HCS] Review is now immutably stored on blockchain');
           } catch (hcsError: any) {
             console.error('[HCS] ⚠️ Failed to submit review to HCS:', hcsError);
+
+            // Show user-friendly error
+            if (hcsError.message?.includes('USER_REJECT')) {
+              alert('Review submission was cancelled. Your tip was sent successfully, but the review was not recorded.');
+            } else {
+              alert(`Review submission failed: ${hcsError.message || 'Unknown error'}. Your tip was sent successfully.`);
+            }
+
             // Don't throw - transaction was successful, HCS submission is optional
-            // Review will still be associated with the transaction
+            // Review will still be associated with the transaction via contract logs
           }
+        } else {
+          console.log('[HCS] No review to submit (no rating or comment provided)');
         }
       } catch (contractError: any) {
         console.error('[CONTRACT] Transaction failed:', contractError);
@@ -2008,6 +2022,24 @@ export default function App() {
                 {hederaError && (
                   <p className="text-xs text-red-400 mt-2">{hederaError}</p>
                 )}
+              </div>
+            )}
+
+            {/* Two Transaction Info */}
+            {selectedToken.id === 'hbar' && isHederaConnected && ((review && review.trim()) || rating > 0) && (
+              <div className="mb-4 p-3 bg-blue-900/20 border border-blue-700/50 rounded-xl">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-blue-300 mb-1">Two wallet confirmations required:</p>
+                    <ul className="text-xs text-blue-200 space-y-1">
+                      <li>1️⃣ Tip transaction (sends HBAR to waiter)</li>
+                      <li>2️⃣ Review submission (stores review on blockchain)</li>
+                    </ul>
+                  </div>
+                </div>
               </div>
             )}
 

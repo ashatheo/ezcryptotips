@@ -29,7 +29,8 @@
       "Bash(npm uninstall:*)",
       "Bash(gh api:*)",
       "Bash(node scripts/create-hcs-topic.js:*)",
-      "Bash(node scripts/create-hcs-topic.cjs:*)"
+      "Bash(node scripts/create-hcs-topic.cjs:*)",
+      "Bash(git clone:*)"
     ],
     "deny": [],
     "ask": []
