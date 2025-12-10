@@ -48,8 +48,9 @@ const WALLETCONNECT_PROJECT_ID = 'aac7ba2b84124b57344a78c0e1122d59';
 // --- HCS TOPIC ID FOR REVIEWS ---
 // Topic ID for storing tamper-proof reviews on Hedera Consensus Service
 // All reviews are immutably recorded on HCS for transparency and anti-manipulation
-// IMPORTANT: Vite may convert "0.0.5158297" to scientific notation - always use string literal
-const REVIEWS_TOPIC_ID = '0.0.5158297';
+// IMPORTANT: Vite may convert "0.0.7415185" to scientific notation - always use string literal
+// Created: 2025-12-10 - Topic for Ez Crypto Tips Reviews Storage
+const REVIEWS_TOPIC_ID = '0.0.7415185';
 
 // --- PROVIDER ---
 export const HederaWalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
