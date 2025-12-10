@@ -5,7 +5,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { StarRating } from './StarRating';
+import { ReviewCard } from './ui/review-card';
 import { getWaiterReviews, getReviewHashScanUrl, type StoredReview } from '../lib/hcsReviewService';
 import { Shield, ExternalLink, Clock } from 'lucide-react';
 
@@ -53,6 +53,31 @@ export const ReviewList: React.FC<ReviewListProps> = ({ waiterId, maxReviews = 1
     );
   }
 
+  // Helper function to generate avatar URL or use initials
+  const getAvatarUrl = (review: StoredReview): string => {
+    // Use Unsplash random avatar as placeholder
+    const seed = review.reviewerAccount || review.id || 'default';
+    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
+  };
+
+  // Helper function to generate reviewer handle
+  const getReviewerHandle = (review: StoredReview): string => {
+    if (review.reviewerAccount) {
+      // Shorten Hedera account ID: 0.0.12345 -> 0.0.***45
+      const parts = review.reviewerAccount.split('.');
+      if (parts.length === 3) {
+        return `${parts[0]}.${parts[1]}.${'*'.repeat(parts[2].length - 2)}${parts[2].slice(-2)}`;
+      }
+    }
+    return 'Anonymous User';
+  };
+
+  // Helper function to get reviewer name
+  const getReviewerName = (review: StoredReview): string => {
+    // If we have waiter name from review, use it as "Customer"
+    return review.waiterName ? 'Satisfied Customer' : 'Anonymous';
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -63,49 +88,29 @@ export const ReviewList: React.FC<ReviewListProps> = ({ waiterId, maxReviews = 1
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {reviews.map((review) => (
-          <div
-            key={review.id}
-            className="p-4 bg-black border border-gray-800 rounded-xl hover:border-gray-700 transition-colors"
-          >
-            {/* Rating */}
-            {review.rating && review.rating > 0 && (
-              <div className="flex items-center gap-2 mb-2">
-                <StarRating
-                  rating={review.rating}
-                  onRatingChange={() => {}}
-                  size={16}
-                  color="#00eb78"
-                  readonly
-                />
-                <span className="text-sm text-gray-400">{review.rating}/5</span>
-              </div>
-            )}
+          <div key={review.id} className="relative">
+            <ReviewCard
+              name={getReviewerName(review)}
+              handle={getReviewerHandle(review)}
+              review={review.comment || 'No comment provided'}
+              rating={review.rating || 0}
+              imageUrl={getAvatarUrl(review)}
+              className="bg-black border-gray-800 h-full"
+            />
 
-            {/* Comment */}
-            {review.comment && (
-              <p className="text-gray-300 text-sm mb-3">{review.comment}</p>
-            )}
-
-            {/* Tip Amount */}
-            {review.tipAmount && (
-              <p className="text-xs text-gray-500 mb-2">
-                Tip: {review.tipAmount} {review.tipToken || 'HBAR'}
-              </p>
-            )}
-
-            {/* Footer with verification */}
-            <div className="flex items-center justify-between pt-3 border-t border-gray-800/50">
+            {/* HCS Verification Footer */}
+            <div className="mt-2 flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
                 {review.verified && (
-                  <div className="flex items-center gap-1">
-                    <Shield className="w-3 h-3 text-[#00eb78]" />
-                    <span className="text-xs text-[#00eb78]">HCS Verified</span>
+                  <div className="flex items-center gap-1 text-[#00eb78]">
+                    <Shield className="w-3 h-3" />
+                    <span>HCS Verified</span>
                   </div>
                 )}
                 {review.hcsTimestamp && (
-                  <div className="flex items-center gap-1 text-xs text-gray-600">
+                  <div className="flex items-center gap-1 text-gray-600">
                     <Clock className="w-3 h-3" />
                     <span>
                       {new Date(parseInt(review.hcsTimestamp.split('.')[0]) * 1000).toLocaleDateString()}
@@ -120,13 +125,22 @@ export const ReviewList: React.FC<ReviewListProps> = ({ waiterId, maxReviews = 1
                   href={getReviewHashScanUrl(review.hcsMessageId)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#00eb78] transition-colors"
+                  className="flex items-center gap-1 text-gray-500 hover:text-[#00eb78] transition-colors"
                 >
-                  <span>View on HashScan</span>
+                  <span>HashScan</span>
                   <ExternalLink className="w-3 h-3" />
                 </a>
               )}
             </div>
+
+            {/* Tip Amount Badge */}
+            {review.tipAmount && (
+              <div className="absolute top-2 right-2 bg-[#00eb78]/10 border border-[#00eb78]/30 rounded-full px-3 py-1">
+                <span className="text-xs font-semibold text-[#00eb78]">
+                  {review.tipAmount} {review.tipToken || 'HBAR'}
+                </span>
+              </div>
+            )}
           </div>
         ))}
       </div>

@@ -6,6 +6,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { getWaiterReviews, calculateAverageRating, type StoredReview } from '../lib/hcsReviewService';
+import { ReviewSummaryCard } from './ui/review-summary-card';
 import { Shield, MessageSquare, Star } from 'lucide-react';
 
 interface WaiterRatingCardProps {
@@ -71,36 +72,31 @@ export const WaiterRatingCard: React.FC<WaiterRatingCardProps> = ({
     );
   }
 
+  // Generate summary text
+  const summaryText = `Outstanding: Rated ${averageRating.toFixed(1)} with ${totalRatings} ${totalRatings === 1 ? 'review' : 'reviews'}${waiterName ? ` for ${waiterName}` : ''}.`;
+
   return (
-    <div className={`${compact ? 'p-4' : 'p-6'} bg-black border border-gray-800 rounded-xl`}>
-      {/* Rating Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Star className="w-6 h-6 text-[#00eb78] fill-[#00eb78]" />
-            <span className="text-3xl font-bold text-white">{averageRating.toFixed(1)}</span>
-            <span className="text-gray-500 text-sm">/5.0</span>
-          </div>
-        </div>
-        <div className="text-right">
-          <p className="text-gray-400 text-sm">{totalRatings} {totalRatings === 1 ? 'rating' : 'ratings'}</p>
-          <p className="text-gray-600 text-xs mt-0.5">based on last 40</p>
-          <div className="flex items-center justify-end gap-1 text-xs text-[#00eb78] mt-1">
-            <Shield className="w-3 h-3" />
-            <span>HCS Verified</span>
-          </div>
-        </div>
+    <div className="space-y-6">
+      {/* Use new ReviewSummaryCard component */}
+      <div className="flex justify-center">
+        <ReviewSummaryCard
+          rating={averageRating}
+          reviewCount={totalRatings}
+          maxRating={5}
+          summaryText={summaryText}
+          className="bg-black border-gray-800"
+        />
       </div>
 
       {/* Last 3 Reviews */}
       {reviews.length > 0 && (
-        <div className="space-y-3 pt-4 border-t border-gray-800">
-          <div className="flex items-center gap-2 mb-2">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
             <MessageSquare className="w-4 h-4 text-gray-500" />
             <p className="text-sm font-semibold text-gray-400">Recent Reviews</p>
           </div>
 
-          {reviews.map((review, index) => (
+          {reviews.map((review) => (
             <div
               key={review.id}
               className={`${compact ? 'p-3' : 'p-4'} bg-gray-900/30 border border-gray-800/50 rounded-lg`}
@@ -145,7 +141,7 @@ export const WaiterRatingCard: React.FC<WaiterRatingCardProps> = ({
 
       {/* HCS Badge */}
       {compact && (
-        <div className="mt-3 pt-3 border-t border-gray-800/50">
+        <div className="pt-3 border-t border-gray-800/50">
           <div className="flex items-center gap-2 text-xs text-gray-600">
             <Shield className="w-3 h-3 text-[#00eb78]" />
             <span>Reviews verified on Hedera blockchain</span>

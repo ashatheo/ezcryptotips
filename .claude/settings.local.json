@@ -30,7 +30,8 @@
       "Bash(gh api:*)",
       "Bash(node scripts/create-hcs-topic.js:*)",
       "Bash(node scripts/create-hcs-topic.cjs:*)",
-      "Bash(git clone:*)"
+      "Bash(git clone:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []
