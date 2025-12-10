@@ -90,7 +90,7 @@ export const WaiterRatingCard: React.FC<WaiterRatingCardProps> = ({
 
       {/* Last 3 Reviews */}
       {reviews.length > 0 && (
-        <div className="space-y-3">
+        <div className="bg-black p-6 rounded-xl border border-gray-800 space-y-3">
           <div className="flex items-center gap-2">
             <MessageSquare className="w-4 h-4 text-gray-500" />
             <p className="text-sm font-semibold text-gray-400">Recent Reviews</p>
