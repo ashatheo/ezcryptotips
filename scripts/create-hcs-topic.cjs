@@ -29,10 +29,11 @@ async function createHCSTopic() {
 
   try {
     // Create a new HCS topic
+    // NOTE: No submitKey set - this allows ANYONE to submit messages to the topic
+    // This is required for users to submit reviews without needing our private key
     const transaction = new TopicCreateTransaction()
-      .setTopicMemo('Ez Crypto Tips - Reviews Storage')
-      .setAdminKey(client.operatorPublicKey) // Allow topic updates
-      .setSubmitKey(client.operatorPublicKey); // Allow anyone to submit messages
+      .setTopicMemo('Ez Crypto Tips - Reviews Storage (Public Submissions)')
+      .setAdminKey(client.operatorPublicKey); // Only admin key for topic management
 
     console.log('Creating topic...');
     const txResponse = await transaction.execute(client);
