@@ -597,7 +597,7 @@ export default function App() {
               }
             }
 
-            await submitReview({
+            const hcsTransactionId = await submitReview({
               waiterId: waiterData.id,
               waiterName: waiterData.name,
               restaurant: waiterData.restaurant || '',
@@ -608,7 +608,31 @@ export default function App() {
             });
 
             console.log('[HCS] ✅ Review submitted to Hedera Consensus Service');
+            console.log('[HCS] HCS Transaction ID:', hcsTransactionId);
             console.log('[HCS] Review is now immutably stored on blockchain');
+
+            // Store review reference in Firebase for quick access
+            if (db) {
+              try {
+                console.log('[Firebase] Storing review reference...');
+                await addDoc(collection(db, 'artifacts', 'ez-crypto-tips', 'public', 'data', 'reviews'), {
+                  waiterId: waiterData.id,
+                  waiterName: waiterData.name,
+                  restaurant: waiterData.restaurant || '',
+                  rating: rating > 0 ? rating : undefined,
+                  comment: review.trim(),
+                  tipAmount: waiterReceives,
+                  transactionId: txId,
+                  hcsTransactionId: hcsTransactionId,
+                  verified: true,
+                  createdAt: serverTimestamp(),
+                });
+                console.log('[Firebase] ✅ Review reference stored in Firebase');
+              } catch (fbError) {
+                console.error('[Firebase] ⚠️ Failed to store review reference:', fbError);
+                // Don't throw - HCS submission succeeded, Firebase is just cache
+              }
+            }
           } catch (hcsError: any) {
             console.error('[HCS] ⚠️ Failed to submit review to HCS:', hcsError);
 
