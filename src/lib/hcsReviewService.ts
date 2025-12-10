@@ -220,6 +220,120 @@ export function getReviewHashScanUrl(messageId: string): string {
 }
 
 /**
+ * Verify that a transaction exists and was sent to the specified waiter
+ * @param transactionId Hedera transaction ID (e.g., "0.0.12345@1234567890.123456789")
+ * @param waiterHederaId Expected recipient Hedera Account ID
+ * @returns Verification result with transaction details
+ */
+export async function verifyTipTransaction(
+  transactionId: string,
+  waiterHederaId: string
+): Promise<{ verified: boolean; amount?: number; error?: string }> {
+  try {
+    console.log('[HCS] Verifying transaction:', transactionId);
+    console.log('[HCS] Expected recipient:', waiterHederaId);
+
+    // Parse transaction ID
+    const mirrorNodeUrl = `https://testnet.mirrornode.hedera.com/api/v1/transactions/${transactionId}`;
+
+    const response = await fetch(mirrorNodeUrl);
+    if (!response.ok) {
+      return {
+        verified: false,
+        error: 'Transaction not found on Hedera network'
+      };
+    }
+
+    const data = await response.json();
+
+    if (!data.transactions || data.transactions.length === 0) {
+      return {
+        verified: false,
+        error: 'Transaction not found'
+      };
+    }
+
+    const transaction = data.transactions[0];
+
+    // Check if transaction was successful
+    if (transaction.result !== 'SUCCESS') {
+      return {
+        verified: false,
+        error: `Transaction failed with status: ${transaction.result}`
+      };
+    }
+
+    // Check transfers to find payment to waiter
+    const transfers = transaction.transfers || [];
+    const waiterTransfer = transfers.find((t: any) =>
+      t.account === waiterHederaId && t.amount > 0
+    );
+
+    if (!waiterTransfer) {
+      return {
+        verified: false,
+        error: 'No payment found to this waiter in transaction'
+      };
+    }
+
+    // Convert tinybar to HBAR (1 HBAR = 100,000,000 tinybar)
+    const amountHBAR = waiterTransfer.amount / 100000000;
+
+    console.log('[HCS] ✅ Transaction verified successfully');
+    console.log('[HCS] Amount sent to waiter:', amountHBAR, 'HBAR');
+
+    return {
+      verified: true,
+      amount: amountHBAR
+    };
+
+  } catch (error: any) {
+    console.error('[HCS] ⚠️ Transaction verification failed:', error);
+    return {
+      verified: false,
+      error: error.message || 'Failed to verify transaction'
+    };
+  }
+}
+
+/**
+ * Check if user already left a review for this transaction
+ * @param transactionId Transaction ID to check
+ * @param waiterId Waiter ID
+ * @returns True if duplicate review found
+ */
+export async function checkDuplicateReview(
+  transactionId: string,
+  waiterId: string
+): Promise<boolean> {
+  if (!db) {
+    return false;
+  }
+
+  try {
+    const reviewsRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'reviews');
+    const q = query(
+      reviewsRef,
+      where('waiterId', '==', waiterId),
+      where('transactionId', '==', transactionId),
+      limit(1)
+    );
+
+    const querySnapshot = await getDocs(q);
+    const hasDuplicate = !querySnapshot.empty;
+
+    if (hasDuplicate) {
+      console.log('[HCS] ⚠️ Duplicate review detected for transaction:', transactionId);
+    }
+
+    return hasDuplicate;
+  } catch (error) {
+    console.error('[HCS] Error checking duplicate review:', error);
+    return false;
+  }
+}
+
+/**
  * Calculate average rating from last 40 reviews
  */
 export function calculateAverageRating(reviews: StoredReview[]): {

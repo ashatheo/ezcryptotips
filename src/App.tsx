@@ -25,7 +25,7 @@ import { StarRating } from './components/StarRating';
 import { ReviewList } from './components/ReviewList';
 import { WaiterRatingCard } from './components/WaiterRatingCard';
 import { useWaiterRating } from './hooks/useWaiterRating';
-import { submitReviewToHCS, getReviewHashScanUrl } from './lib/hcsReviewService';
+import { submitReviewToHCS, getReviewHashScanUrl, verifyTipTransaction, checkDuplicateReview } from './lib/hcsReviewService';
 import { SparklesCore } from './components/ui/sparkles';
 import { Confetti, type ConfettiRef } from './components/ui/confetti';
 import confetti from 'canvas-confetti';
@@ -572,6 +572,28 @@ export default function App() {
         if (waiterData?.id && ((review && review.trim()) || rating > 0)) {
           try {
             console.log('[HCS] Submitting review to HCS...');
+
+            // Check for duplicate review
+            const isDuplicate = await checkDuplicateReview(txId, waiterData.id);
+            if (isDuplicate) {
+              console.log('[HCS] ⚠️ Duplicate review prevented - review already exists for this transaction');
+              // Don't submit duplicate, but don't throw error either
+              return;
+            }
+
+            // Verify transaction authenticity (optional - adds extra security)
+            if (waiterData.hederaId) {
+              console.log('[HCS] Verifying transaction authenticity...');
+              const verification = await verifyTipTransaction(txId, waiterData.hederaId);
+
+              if (!verification.verified) {
+                console.warn('[HCS] ⚠️ Transaction verification failed:', verification.error);
+                console.warn('[HCS] Proceeding with review submission anyway (verification is optional)');
+              } else {
+                console.log('[HCS] ✅ Transaction verified:', verification.amount, 'HBAR sent to waiter');
+              }
+            }
+
             await submitReview({
               waiterId: waiterData.id,
               waiterName: waiterData.name,
