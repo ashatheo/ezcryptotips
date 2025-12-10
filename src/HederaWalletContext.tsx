@@ -193,19 +193,44 @@ export const HederaWalletProvider: React.FC<{ children: React.ReactNode }> = ({ 
         const transactionBase64 = Buffer.from(transactionBytes).toString('base64');
 
         // Sign and execute transaction
-        const result = await dAppConnector.signAndExecuteTransaction({
+        const result: any = await dAppConnector.signAndExecuteTransaction({
           signerAccountId: `hedera:testnet:${accountId}`,
           transactionList: transactionBase64,
         });
 
-        console.log('Transaction result:', result);
+        console.log('[HBAR] Transaction result:', result);
+        console.log('[HBAR] Result type:', typeof result);
+        console.log('[HBAR] Result keys:', result ? Object.keys(result) : 'null');
+        console.log('[HBAR] Full result structure:', JSON.stringify(result, null, 2));
 
         // Extract transaction ID from result
-        if (result && result.response) {
-          return result.response.transactionId || 'Transaction submitted';
+        // Try multiple possible structures
+        let txId = null;
+
+        // Try: result.result.transactionId (JsonRpcResult structure)
+        if (result?.result?.transactionId) {
+          txId = result.result.transactionId;
+          console.log('[HBAR] Found txId in result.result.transactionId:', txId);
+        }
+        // Try: result.transactionId (direct property)
+        else if (result?.transactionId) {
+          txId = result.transactionId;
+          console.log('[HBAR] Found txId in result.transactionId:', txId);
+        }
+        // Try: result.response?.transactionId (old structure)
+        else if (result?.response?.transactionId) {
+          txId = result.response.transactionId;
+          console.log('[HBAR] Found txId in result.response.transactionId:', txId);
         }
 
-        return 'Transaction submitted successfully';
+        if (txId) {
+          console.log('[HBAR] ✅ Extracted transaction ID:', txId);
+          return txId;
+        }
+
+        console.error('[HBAR] ⚠️ No transaction ID found in wallet response');
+        console.error('[HBAR] Result object:', result);
+        throw new Error('Failed to extract transaction ID from wallet response');
       } catch (err: any) {
         console.error('Transfer failed:', err);
         setError(err.message || 'Transfer failed');
@@ -269,53 +294,70 @@ export const HederaWalletProvider: React.FC<{ children: React.ReactNode }> = ({ 
         console.log('[CONTRACT] Transaction frozen, signing and executing...');
 
         // Sign and execute transaction
-        const result = await dAppConnector.signAndExecuteTransaction({
+        const result: any = await dAppConnector.signAndExecuteTransaction({
           signerAccountId: `hedera:testnet:${accountId}`,
           transactionList: transactionBase64,
         });
 
         console.log('[CONTRACT] Transaction result:', result);
+        console.log('[CONTRACT] Result type:', typeof result);
+        console.log('[CONTRACT] Result keys:', result ? Object.keys(result) : 'null');
+        console.log('[CONTRACT] Full result structure:', JSON.stringify(result, null, 2));
 
-        // Extract transaction ID from result
-        if (result && result.response) {
-          const txId = result.response.transactionId || 'Transaction submitted';
-          console.log('[CONTRACT] Transaction ID:', txId);
+        // Extract transaction ID from result - try multiple structures
+        let txId = null;
 
-          // Wait a bit and check transaction status from mirror node
-          console.log('[CONTRACT] Verifying transaction status...');
-          await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds for consensus
-
-          try {
-            const statusResponse = await fetch(`https://testnet.mirrornode.hedera.com/api/v1/transactions/${txId}`);
-            const statusData = await statusResponse.json();
-
-            console.log('[CONTRACT] Transaction status:', statusData);
-
-            if (statusData.transactions && statusData.transactions.length > 0) {
-              const tx = statusData.transactions[0];
-              const status = tx.result;
-
-              if (status === 'SUCCESS') {
-                console.log('[CONTRACT] ✅ Tip sent successfully!');
-                console.log('[CONTRACT] 💰 Amount:', tipAmount, 'HBAR (5% fee auto-split by contract)');
-                return txId;
-              } else {
-                console.error('[CONTRACT] ❌ Transaction failed with status:', status);
-                throw new Error(`Transaction failed: ${status}`);
-              }
-            } else {
-              console.warn('[CONTRACT] ⏳ Transaction not yet confirmed on network');
-              // Still return txId but note it's pending
-              return txId;
-            }
-          } catch (statusError) {
-            console.warn('[CONTRACT] Could not verify transaction status:', statusError);
-            // Return txId anyway, let user check manually
-            return txId;
-          }
+        if (result?.result?.transactionId) {
+          txId = result.result.transactionId;
+          console.log('[CONTRACT] Found txId in result.result.transactionId:', txId);
+        } else if (result?.transactionId) {
+          txId = result.transactionId;
+          console.log('[CONTRACT] Found txId in result.transactionId:', txId);
+        } else if (result?.response?.transactionId) {
+          txId = result.response.transactionId;
+          console.log('[CONTRACT] Found txId in result.response.transactionId:', txId);
         }
 
-        return 'Transaction submitted successfully';
+        if (!txId) {
+          console.error('[CONTRACT] ⚠️ No transaction ID found in result');
+          console.error('[CONTRACT] Result object:', result);
+          throw new Error('Failed to extract transaction ID from wallet response');
+        }
+
+        console.log('[CONTRACT] Transaction ID:', txId);
+
+        // Wait a bit and check transaction status from mirror node
+        console.log('[CONTRACT] Verifying transaction status...');
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds for consensus
+
+        try {
+          const statusResponse = await fetch(`https://testnet.mirrornode.hedera.com/api/v1/transactions/${txId}`);
+          const statusData = await statusResponse.json();
+
+          console.log('[CONTRACT] Transaction status:', statusData);
+
+          if (statusData.transactions && statusData.transactions.length > 0) {
+            const tx = statusData.transactions[0];
+            const status = tx.result;
+
+            if (status === 'SUCCESS') {
+              console.log('[CONTRACT] ✅ Tip sent successfully!');
+              console.log('[CONTRACT] 💰 Amount:', tipAmount, 'HBAR (5% fee auto-split by contract)');
+              return txId;
+            } else {
+              console.error('[CONTRACT] ❌ Transaction failed with status:', status);
+              throw new Error(`Transaction failed: ${status}`);
+            }
+          } else {
+            console.warn('[CONTRACT] ⏳ Transaction not yet confirmed on network');
+            // Still return txId but note it's pending
+            return txId;
+          }
+        } catch (statusError) {
+          console.warn('[CONTRACT] Could not verify transaction status:', statusError);
+          // Return txId anyway, let user check manually
+          return txId;
+        }
       } catch (err: any) {
         console.error('[CONTRACT] Failed to send tip:', err);
         setError(err.message || 'Failed to send tip via contract');
@@ -377,19 +419,71 @@ export const HederaWalletProvider: React.FC<{ children: React.ReactNode }> = ({ 
         const transactionBase64 = Buffer.from(transactionBytes).toString('base64');
 
         // Sign and execute transaction
-        const result = await dAppConnector.signAndExecuteTransaction({
+        const result: any = await dAppConnector.signAndExecuteTransaction({
           signerAccountId: `hedera:testnet:${accountId}`,
           transactionList: transactionBase64,
         });
 
-        console.log('[HCS] Review submitted successfully:', result);
+        console.log('[HCS] Review submission result:', result);
+        console.log('[HCS] Result type:', typeof result);
+        console.log('[HCS] Result keys:', result ? Object.keys(result) : 'null');
+        console.log('[HCS] Full result structure:', JSON.stringify(result, null, 2));
 
-        // Extract transaction ID from result
-        if (result && result.response) {
-          return result.response.transactionId || 'Review submitted to HCS';
+        // Extract transaction ID from result - try multiple structures
+        let txId = null;
+
+        if (result?.result?.transactionId) {
+          txId = result.result.transactionId;
+          console.log('[HCS] Found txId in result.result.transactionId:', txId);
+        } else if (result?.transactionId) {
+          txId = result.transactionId;
+          console.log('[HCS] Found txId in result.transactionId:', txId);
+        } else if (result?.response?.transactionId) {
+          txId = result.response.transactionId;
+          console.log('[HCS] Found txId in result.response.transactionId:', txId);
         }
 
-        return 'Review submitted successfully to blockchain';
+        if (!txId) {
+          console.error('[HCS] ⚠️ No transaction ID found in result');
+          console.error('[HCS] Result object:', result);
+          throw new Error('Failed to extract transaction ID from wallet response');
+        }
+
+        console.log('[HCS] Extracted transaction ID:', txId);
+
+        // Wait a bit and verify transaction on mirror node
+        console.log('[HCS] Verifying transaction status on mirror node...');
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds for consensus
+
+        try {
+          const statusResponse = await fetch(`https://testnet.mirrornode.hedera.com/api/v1/transactions/${txId}`);
+          const statusData = await statusResponse.json();
+
+          console.log('[HCS] Transaction status:', statusData);
+
+          if (statusData.transactions && statusData.transactions.length > 0) {
+            const tx = statusData.transactions[0];
+            const status = tx.result;
+
+            if (status === 'SUCCESS') {
+              console.log('[HCS] ✅ Review submitted successfully to blockchain!');
+              console.log('[HCS] Transaction ID:', txId);
+              console.log('[HCS] View on HashScan:', `https://hashscan.io/testnet/transaction/${txId}`);
+              return txId;
+            } else {
+              console.error('[HCS] ❌ Transaction failed with status:', status);
+              throw new Error(`Review submission failed: ${status}`);
+            }
+          } else {
+            console.warn('[HCS] ⏳ Transaction not yet confirmed on network');
+            // Still return txId but note it's pending
+            return txId;
+          }
+        } catch (statusError) {
+          console.warn('[HCS] Could not verify transaction status:', statusError);
+          // Return txId anyway, let user check manually
+          return txId;
+        }
       } catch (err: any) {
         console.error('[HCS] Review submission failed:', err);
         setError(err.message || 'Failed to submit review');
