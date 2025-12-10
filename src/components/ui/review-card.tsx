@@ -60,7 +60,7 @@ const ReviewCard = React.forwardRef<HTMLDivElement, ReviewCardProps>(
           </div>
           {/* Rating Section */}
           <div className="flex items-center gap-1 text-lg font-bold text-white">
-            <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+            <Star className="w-5 h-5 text-[#00eb78] fill-[#00eb78]" />
             <span>{rating.toFixed(1)}</span>
           </div>
         </div>

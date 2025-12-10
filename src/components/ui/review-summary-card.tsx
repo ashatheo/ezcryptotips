@@ -107,7 +107,7 @@ export const ReviewSummaryCard: React.FC<ReviewSummaryCardProps> = ({
             <Star
               className={cn(
                 'h-6 w-6',
-                rating >= i + 1 ? 'text-yellow-400' : 'text-muted-foreground/50'
+                rating >= i + 1 ? 'text-[#00eb78]' : 'text-gray-600'
               )}
               fill="currentColor"
             />
